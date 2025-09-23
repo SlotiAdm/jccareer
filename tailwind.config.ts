@@ -19,6 +19,15 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        
+        // Terminal brand colors
+        terminal: {
+          green: "hsl(var(--terminal-green))",
+          "green-hover": "hsl(var(--terminal-green-hover))",
+          text: "hsl(var(--terminal-text))",
+          light: "hsl(var(--terminal-light))",
+          border: "hsl(var(--terminal-border))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

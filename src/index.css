@@ -2,14 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* O Terminal Design System - Cores profissionais em HSL */
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 28 10% 17%; /* #2d2926 cinza escuro */
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -17,14 +15,14 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 160 100% 34%; /* #00ab84 verde destaque */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 98%;
+    --secondary-foreground: 28 10% 17%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 50%;
 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
@@ -32,8 +30,8 @@ All colors MUST be HSL.
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 0 0% 88%; /* #e0e0e0 cinza claro */
+    --input: 0 0% 88%;
     --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
@@ -53,6 +51,24 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Terminal specific tokens */
+    --terminal-green: 160 100% 34%; /* Cor destaque principal */
+    --terminal-green-hover: 160 100% 30%;
+    --terminal-text: 28 10% 17%; /* Texto principal */
+    --terminal-light: 0 0% 96%; /* Backgrounds sutis */
+    --terminal-border: 0 0% 88%; /* Bordas e divisores */
+    
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--terminal-green)), hsl(160 100% 40%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -2px hsl(var(--terminal-green) / 0.1);
+    --shadow-card: 0 2px 8px -1px hsl(0 0% 0% / 0.06);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -100,6 +116,36 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  /* Typography hierarchy */
+  .text-hero {
+    @apply text-4xl md:text-5xl font-bold leading-tight;
+  }
+  
+  .text-subtitle {
+    @apply text-lg md:text-xl text-muted-foreground leading-relaxed;
+  }
+  
+  .text-section-title {
+    @apply text-2xl md:text-3xl font-semibold;
+  }
+  
+  /* Components */
+  .btn-hero {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 rounded-lg font-semibold text-lg shadow-md hover:shadow-lg transition-all duration-300;
+  }
+  
+  .card-feature {
+    @apply bg-white p-6 rounded-xl border border-border shadow-sm hover:shadow-md transition-all duration-300;
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .shadow-terminal {
+    box-shadow: var(--shadow-soft);
   }
 }
