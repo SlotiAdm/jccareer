@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.career-gps]
 verify_jwt = false
+
+[functions.erp-simulator]
+verify_jwt = false
+
+[functions.spreadsheet-arena]
+verify_jwt = false
+
+[functions.bsc-strategic]
+verify_jwt = false
