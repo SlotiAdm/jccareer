@@ -270,11 +270,21 @@ export default function Dashboard() {
                         </div>
                       </div>
                       
-                      <Link to={`/module/${module.name}`}>
+                <Link to={`/module/${module.name}`}>
+                  <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
+                    {module.name === 'interview_dojo' ? (
+                      <Link to="/interview-dojo" className="w-full">
                         <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
                           {isCompleted ? 'Refazer Simulação' : 'Iniciar Simulação'}
                         </Button>
                       </Link>
+                    ) : (
+                      <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
+                        {isCompleted ? 'Refazer Simulação' : 'Iniciar Simulação'}
+                      </Button>
+                    )}
+                  </Button>
+                </Link>
                     </CardContent>
                   </Card>
                 );

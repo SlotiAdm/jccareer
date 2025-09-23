@@ -45,6 +45,15 @@ export default function ModuleTraining() {
   const [skills, setSkills] = useState("");
   const [longTermGoal, setLongTermGoal] = useState("");
   const [timelineYears, setTimelineYears] = useState(3);
+  
+  // New states for additional modules
+  const [businessProblem, setBusinessProblem] = useState("");
+  const [userSolution, setUserSolution] = useState("");
+  const [challengeType, setChallengeType] = useState("formula_calculation");
+  const [userFormula, setUserFormula] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [strategicObjectives, setStrategicObjectives] = useState("");
 
   const getIcon = (iconName: string) => {
     const icons = {
@@ -198,6 +207,127 @@ export default function ModuleTraining() {
       console.error('Error:', error);
       toast({
         title: "Erro na análise",
+        description: error.message || "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleERPSimulation = async () => {
+    if (!businessProblem) {
+      toast({
+        title: "Erro",
+        description: "Por favor, descreva o problema de negócio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('erp-simulator', {
+        body: {
+          business_problem: businessProblem,
+          user_solution: userSolution,
+          user_id: profile?.user_id
+        }
+      });
+
+      if (error) throw error;
+      
+      setResult(data.analysis);
+      toast({
+        title: "Simulação concluída!",
+        description: "Análise de ERP gerada com sucesso.",
+      });
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast({
+        title: "Erro na simulação",
+        description: error.message || "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSpreadsheetChallenge = async () => {
+    if (!userFormula) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira sua fórmula ou abordagem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('spreadsheet-arena', {
+        body: {
+          challenge_type: challengeType,
+          user_formula: userFormula,
+          user_approach: userFormula,
+          user_id: profile?.user_id
+        }
+      });
+
+      if (error) throw error;
+      
+      setResult(data.analysis);
+      toast({
+        title: "Desafio concluído!",
+        description: "Sua solução foi avaliada.",
+      });
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast({
+        title: "Erro na avaliação",
+        description: error.message || "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleBSCCreation = async () => {
+    if (!strategicObjectives) {
+      toast({
+        title: "Erro",
+        description: "Por favor, descreva os objetivos estratégicos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bsc-strategic', {
+        body: {
+          company_info: {
+            name: companyName || 'Empresa',
+            industry: industry || 'Geral'
+          },
+          strategic_objectives: strategicObjectives,
+          user_id: profile?.user_id
+        }
+      });
+
+      if (error) throw error;
+      
+      setResult(data.analysis);
+      toast({
+        title: "BSC criado!",
+        description: "Seu Balanced Scorecard foi gerado.",
+      });
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast({
+        title: "Erro na criação",
         description: error.message || "Tente novamente",
         variant: "destructive",
       });
@@ -379,17 +509,178 @@ export default function ModuleTraining() {
           </div>
         );
 
-      default:
+      case 'erp_simulator':
         return (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="text-gray-500 mb-4">
-                <Database className="h-16 w-16 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Módulo em Desenvolvimento</h3>
-                <p>Este simulador estará disponível em breve.</p>
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h4 className="font-semibold text-blue-900 mb-2">Cenário de Negócio</h4>
+              <p className="text-blue-800 text-sm">
+                Você é um analista e precisa extrair informações de um ERP para resolver problemas de negócio.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="business-problem">Problema de Negócio *</Label>
+                <Textarea
+                  id="business-problem"
+                  placeholder="Ex: Preciso gerar um relatório de vendas do último trimestre por região, excluindo devoluções..."
+                  value={businessProblem}
+                  onChange={(e) => setBusinessProblem(e.target.value)}
+                  rows={6}
+                  className="mt-2"
+                />
               </div>
-            </CardContent>
-          </Card>
+              
+              <div>
+                <Label htmlFor="user-solution">Sua Abordagem (Opcional)</Label>
+                <Textarea
+                  id="user-solution"
+                  placeholder="Descreva como você resolveria este problema no ERP..."
+                  value={userSolution}
+                  onChange={(e) => setUserSolution(e.target.value)}
+                  rows={4}
+                  className="mt-2"
+                />
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleERPSimulation}
+              disabled={processing || !businessProblem}
+              className="w-full"
+              size="lg"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analisando...
+                </>
+              ) : (
+                'Simular ERP'
+              )}
+            </Button>
+          </div>
+        );
+
+      case 'spreadsheet_arena':
+        return (
+          <div className="space-y-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <h4 className="font-semibold text-green-900 mb-2">Arena de Desafios</h4>
+              <p className="text-green-800 text-sm">
+                Escolha um desafio e mostre suas habilidades em planilhas!
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="challenge-type">Tipo de Desafio</Label>
+                <select
+                  id="challenge-type"
+                  value={challengeType}
+                  onChange={(e) => setChallengeType(e.target.value)}
+                  className="mt-2 w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="formula_calculation">Cálculo com Fórmulas</option>
+                  <option value="pivot_analysis">Análise com Tabela Dinâmica</option>
+                  <option value="conditional_formatting">Formatação Condicional</option>
+                </select>
+              </div>
+              
+              <div>
+                <Label htmlFor="user-formula">Sua Fórmula/Abordagem *</Label>
+                <Textarea
+                  id="user-formula"
+                  placeholder="Ex: =AVERAGEIFS(C:C, A:A, 'Norte', B:B, '<>Beta') ou descreva sua abordagem..."
+                  value={userFormula}
+                  onChange={(e) => setUserFormula(e.target.value)}
+                  rows={4}
+                  className="mt-2"
+                />
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleSpreadsheetChallenge}
+              disabled={processing || !userFormula}
+              className="w-full"
+              size="lg"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analisando...
+                </>
+              ) : (
+                'Avaliar Solução'
+              )}
+            </Button>
+          </div>
+        );
+
+      case 'bsc_strategic':
+        return (
+          <div className="space-y-6">
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <h4 className="font-semibold text-purple-900 mb-2">Balanced Scorecard</h4>
+              <p className="text-purple-800 text-sm">
+                Vamos criar um BSC completo para sua empresa com as 4 perspectivas estratégicas.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="company-name">Nome da Empresa</Label>
+                <Input
+                  id="company-name"
+                  placeholder="Ex: TechCorp Soluções"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="industry">Setor de Atuação</Label>
+                <Input
+                  id="industry"
+                  placeholder="Ex: Tecnologia, Varejo, Consultoria..."
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="strategic-objectives">Objetivos Estratégicos *</Label>
+                <Textarea
+                  id="strategic-objectives"
+                  placeholder="Descreva os principais objetivos estratégicos da empresa: crescimento, rentabilidade, satisfação do cliente, inovação..."
+                  value={strategicObjectives}
+                  onChange={(e) => setStrategicObjectives(e.target.value)}
+                  rows={6}
+                  className="mt-2"
+                />
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleBSCCreation}
+              disabled={processing || !strategicObjectives}
+              className="w-full"
+              size="lg"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Criando BSC...
+                </>
+              ) : (
+                'Gerar Balanced Scorecard'
+              )}
+            </Button>
+          </div>
         );
     }
   };

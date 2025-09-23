@@ -11,6 +11,7 @@ import Checkout from "./pages/Checkout";
 import Confirmation from "./pages/Confirmation";
 import Dashboard from "./pages/Dashboard";
 import ModuleTraining from "./pages/ModuleTraining";
+import InterviewDojo from "./pages/InterviewDojo";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +42,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresActiveSubscription>
                   <ModuleTraining />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/interview-dojo" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <InterviewDojo />
                 </ProtectedRoute>
               } 
             />
