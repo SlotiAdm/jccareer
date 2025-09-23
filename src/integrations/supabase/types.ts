@@ -14,110 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      course_lessons: {
-        Row: {
-          content: string | null
-          created_at: string
-          description: string | null
-          duration_minutes: number | null
-          id: string
-          materials_url: string | null
-          module_id: string
-          order_index: number
-          title: string
-          video_url: string | null
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string
-          description?: string | null
-          duration_minutes?: number | null
-          id?: string
-          materials_url?: string | null
-          module_id: string
-          order_index: number
-          title: string
-          video_url?: string | null
-        }
-        Update: {
-          content?: string | null
-          created_at?: string
-          description?: string | null
-          duration_minutes?: number | null
-          id?: string
-          materials_url?: string | null
-          module_id?: string
-          order_index?: number
-          title?: string
-          video_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "course_lessons_module_id_fkey"
-            columns: ["module_id"]
-            isOneToOne: false
-            referencedRelation: "course_modules"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      course_modules: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          order_index: number
-          title: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          order_index: number
-          title: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          order_index?: number
-          title?: string
-        }
-        Relationships: []
-      }
-      intelligence_flow_posts: {
-        Row: {
-          author: string | null
-          content: string
-          created_at: string
-          excerpt: string | null
-          id: string
-          published_at: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          author?: string | null
-          content: string
-          created_at?: string
-          excerpt?: string | null
-          id?: string
-          published_at?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          author?: string | null
-          content?: string
-          created_at?: string
-          excerpt?: string | null
-          id?: string
-          published_at?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           cpf_cnpj: string | null
@@ -160,40 +56,174 @@ export type Database = {
         }
         Relationships: []
       }
-      user_lesson_progress: {
+      simulation_sessions: {
         Row: {
+          ai_response: Json | null
           completed: boolean | null
-          completed_at: string | null
           created_at: string
+          duration_seconds: number | null
+          feedback: string | null
           id: string
-          lesson_id: string
+          input_data: Json | null
+          module_id: string
+          score: number | null
+          session_type: string
+          updated_at: string
           user_id: string
         }
         Insert: {
+          ai_response?: Json | null
           completed?: boolean | null
-          completed_at?: string | null
           created_at?: string
+          duration_seconds?: number | null
+          feedback?: string | null
           id?: string
-          lesson_id: string
+          input_data?: Json | null
+          module_id: string
+          score?: number | null
+          session_type: string
+          updated_at?: string
           user_id: string
         }
         Update: {
+          ai_response?: Json | null
           completed?: boolean | null
-          completed_at?: string | null
           created_at?: string
+          duration_seconds?: number | null
+          feedback?: string | null
           id?: string
-          lesson_id?: string
+          input_data?: Json | null
+          module_id?: string
+          score?: number | null
+          session_type?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "user_lesson_progress_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: "simulation_sessions_module_id_fkey"
+            columns: ["module_id"]
             isOneToOne: false
-            referencedRelation: "course_lessons"
+            referencedRelation: "training_modules"
             referencedColumns: ["id"]
           },
         ]
+      }
+      training_modules: {
+        Row: {
+          created_at: string
+          description: string
+          difficulty_level: number | null
+          estimated_time_minutes: number | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          order_index: number
+          points_reward: number | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          difficulty_level?: number | null
+          estimated_time_minutes?: number | null
+          icon: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          order_index: number
+          points_reward?: number | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          difficulty_level?: number | null
+          estimated_time_minutes?: number | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          order_index?: number
+          points_reward?: number | null
+          title?: string
+        }
+        Relationships: []
+      }
+      user_module_completions: {
+        Row: {
+          completed_at: string
+          completion_data: Json | null
+          created_at: string
+          id: string
+          module_id: string
+          points_earned: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          completion_data?: Json | null
+          created_at?: string
+          id?: string
+          module_id: string
+          points_earned?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          completion_data?: Json | null
+          created_at?: string
+          id?: string
+          module_id?: string
+          points_earned?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_module_completions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "training_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_progress: {
+        Row: {
+          created_at: string
+          id: string
+          last_activity_at: string | null
+          modules_completed: number | null
+          proficiency_level: number | null
+          simulations_completed: number | null
+          total_points: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_activity_at?: string | null
+          modules_completed?: number | null
+          proficiency_level?: number | null
+          simulations_completed?: number | null
+          total_points?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_activity_at?: string | null
+          modules_completed?: number | null
+          proficiency_level?: number | null
+          simulations_completed?: number | null
+          total_points?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {

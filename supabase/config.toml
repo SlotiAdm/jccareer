@@ -1,1 +1,13 @@
 project_id = "vtckfsguxmxsdcnehqju"
+
+[functions.curriculum-analysis]
+verify_jwt = false
+
+[functions.interview-dojo]
+verify_jwt = false
+
+[functions.communication-lab]
+verify_jwt = false
+
+[functions.career-gps]
+verify_jwt = false

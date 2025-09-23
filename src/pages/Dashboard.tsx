@@ -5,66 +5,83 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Zap, BookOpen, MessageCircle, Clock, CheckCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Star, Trophy, Clock, ExternalLink, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation } from "lucide-react";
 import { Link } from "react-router-dom";
 
-interface IntelligencePost {
+interface TrainingModule {
   id: string;
+  name: string;
   title: string;
-  excerpt: string;
-  published_at: string;
+  description: string;
+  icon: string;
+  difficulty_level: number;
+  estimated_time_minutes: number;
+  points_reward: number;
+  order_index: number;
 }
 
-interface CourseProgress {
-  totalLessons: number;
-  completedLessons: number;
-  currentModule: string;
-  currentLesson: string;
+interface UserProgress {
+  total_points: number;
+  proficiency_level: number;
+  modules_completed: number;
+  simulations_completed: number;
 }
 
 export default function Dashboard() {
   const { profile } = useAuth();
-  const [recentPosts, setRecentPosts] = useState<IntelligencePost[]>([]);
-  const [courseProgress, setCourseProgress] = useState<CourseProgress | null>(null);
+  const [modules, setModules] = useState<TrainingModule[]>([]);
+  const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
+  const [completedModules, setCompletedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const getIcon = (iconName: string) => {
+    const icons = {
+      FileText,
+      MessageSquare,
+      Presentation,
+      Database,
+      Table,
+      Target,
+      Navigation
+    };
+    return icons[iconName as keyof typeof icons] || FileText;
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Fetch recent intelligence posts
-        const { data: posts } = await supabase
-          .from('intelligence_flow_posts')
-          .select('id, title, excerpt, published_at')
-          .order('published_at', { ascending: false })
-          .limit(3);
+        // Fetch training modules
+        const { data: modulesData } = await supabase
+          .from('training_modules')
+          .select('*')
+          .eq('is_active', true)
+          .order('order_index');
 
-        if (posts) {
-          setRecentPosts(posts);
+        if (modulesData) {
+          setModules(modulesData);
         }
 
-        // Fetch course progress
+        // Fetch user progress
         const { data: progressData } = await supabase
-          .from('user_lesson_progress')
-          .select(`
-            lesson_id,
-            completed,
-            course_lessons(
-              title,
-              course_modules(title)
-            )
-          `)
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', profile?.user_id)
+          .single();
+
+        if (progressData) {
+          setUserProgress(progressData);
+        }
+
+        // Fetch completed modules
+        const { data: completionsData } = await supabase
+          .from('user_module_completions')
+          .select('module_id')
           .eq('user_id', profile?.user_id);
 
-        // Calculate progress (simplified for MVP)
-        const totalLessons = 8; // Based on sample data
-        const completedLessons = progressData?.filter(p => p.completed).length || 0;
-        
-        setCourseProgress({
-          totalLessons,
-          completedLessons,
-          currentModule: "Fundamentos da Análise Estratégica",
-          currentLesson: "Introdução à Análise Estratégica"
-        });
+        if (completionsData) {
+          setCompletedModules(completionsData.map(c => c.module_id));
+        }
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -78,12 +95,27 @@ export default function Dashboard() {
     }
   }, [profile]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+  const getProficiencyLevel = (points: number) => {
+    const levels = [
+      { min: 0, max: 499, name: "Iniciante", color: "bg-gray-400" },
+      { min: 500, max: 999, name: "Desenvolvendo", color: "bg-blue-400" },
+      { min: 1000, max: 1999, name: "Competente", color: "bg-green-400" },
+      { min: 2000, max: 3499, name: "Proficiente", color: "bg-yellow-400" },
+      { min: 3500, max: Infinity, name: "Especialista", color: "bg-purple-400" }
+    ];
+    
+    return levels.find(level => points >= level.min && points <= level.max) || levels[0];
+  };
+
+  const getDifficultyColor = (level: number) => {
+    const colors = {
+      1: "bg-green-100 text-green-800",
+      2: "bg-blue-100 text-blue-800", 
+      3: "bg-yellow-100 text-yellow-800",
+      4: "bg-orange-100 text-orange-800",
+      5: "bg-red-100 text-red-800"
+    };
+    return colors[level as keyof typeof colors] || colors[1];
   };
 
   if (loading) {
@@ -97,6 +129,10 @@ export default function Dashboard() {
     );
   }
 
+  const proficiencyLevel = getProficiencyLevel(userProgress?.total_points || 0);
+  const progressToNext = userProgress?.total_points || 0;
+  const nextLevelThreshold = proficiencyLevel.max === Infinity ? progressToNext : proficiencyLevel.max + 1;
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -105,197 +141,169 @@ export default function Dashboard() {
         <div className="p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Bem-vindo de volta, {profile?.full_name || 'Analista'}
+              Bem-vindo ao Terminal, {profile?.full_name || 'Analista'}
             </h1>
             <p className="text-gray-600">
-              Continue sua jornada de desenvolvimento analítico
+              Seu centro de simulação para desenvolvimento estratégico
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Status da Assinatura */}
+          {/* Progress Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  Status da Assinatura
+                  <Trophy className="h-5 w-5 text-yellow-500" />
+                  Nível de Proficiência
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Badge variant="default" className="bg-green-100 text-green-800">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Badge className={`${proficiencyLevel.color} text-white`}>
+                      {proficiencyLevel.name}
+                    </Badge>
+                    <span className="text-sm font-medium">{progressToNext} pts</span>
+                  </div>
+                  {proficiencyLevel.max !== Infinity && (
+                    <Progress 
+                      value={(progressToNext / nextLevelThreshold) * 100} 
+                      className="h-2"
+                    />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-blue-500" />
+                  Módulos Concluídos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {userProgress?.modules_completed || 0}/{modules.length}
+                </div>
+                <p className="text-sm text-gray-600">
+                  {Math.round(((userProgress?.modules_completed || 0) / modules.length) * 100)}% concluído
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-green-500" />
+                  Simulações Realizadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {userProgress?.simulations_completed || 0}
+                </div>
+                <p className="text-sm text-gray-600">
+                  Total de sessões
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Status da Assinatura</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Badge variant="default" className="bg-green-100 text-green-800 mb-2">
                   {profile?.subscription_status === 'active' ? 'Ativa' : 'Inativa'}
                 </Badge>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-gray-600">
                   Plano: {profile?.subscription_plan === 'annual' ? 'Anual' : 'Mensal'}
                 </p>
               </CardContent>
             </Card>
-
-            {/* Progresso do Curso */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-blue-500" />
-                  Progresso do Curso
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Aulas Concluídas</span>
-                    <span>{courseProgress?.completedLessons || 0}/{courseProgress?.totalLessons || 0}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all"
-                      style={{ 
-                        width: `${((courseProgress?.completedLessons || 0) / (courseProgress?.totalLessons || 1)) * 100}%` 
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Últimas Análises */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-yellow-500" />
-                  Fluxo de Inteligência
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 mb-3">
-                  {recentPosts.length} novas análises disponíveis
-                </p>
-                <Link to="/intelligence">
-                  <Button size="sm" variant="outline" className="w-full">
-                    Ver Análises
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Últimas Análises do Fluxo */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  ÚLTIMAS ANÁLISES DO FLUXO
-                </CardTitle>
-                <CardDescription>
-                  Conteúdo estratégico mais recente
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {recentPosts.map((post) => (
-                  <div key={post.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-grow">
-                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                          {post.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                          {post.excerpt}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <Clock className="h-3 w-3" />
-                          {formatDate(post.published_at)}
+          {/* Training Modules Grid */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Módulos de Treinamento
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {modules.map((module) => {
+                const IconComponent = getIcon(module.icon);
+                const isCompleted = completedModules.includes(module.id);
+                
+                return (
+                  <Card key={module.id} className={`transition-all hover:shadow-lg cursor-pointer ${
+                    isCompleted ? 'ring-2 ring-green-500 bg-green-50' : ''
+                  }`}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <IconComponent className={`h-8 w-8 ${
+                          isCompleted ? 'text-green-600' : 'text-primary'
+                        }`} />
+                        <div className="flex gap-2">
+                          <Badge className={getDifficultyColor(module.difficulty_level)} variant="outline">
+                            Nível {module.difficulty_level}
+                          </Badge>
+                          {isCompleted && (
+                            <Badge className="bg-green-100 text-green-800">
+                              Concluído
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {recentPosts.length === 0 && (
-                  <p className="text-gray-500 text-center py-4">
-                    Nenhuma análise disponível no momento
-                  </p>
-                )}
-                
-                <Link to="/intelligence">
-                  <Button variant="outline" className="w-full">
-                    Ver Todas as Análises
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Continue de onde parou */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  CONTINUE DE ONDE PAROU
-                </CardTitle>
-                <CardDescription>
-                  Formação Analista Estratégico
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                    <BookOpen className="h-12 w-12 text-gray-400" />
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">
-                      {courseProgress?.currentModule}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      {courseProgress?.currentLesson}
-                    </p>
-                    
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span>Módulo 1 - Aula 1/2</span>
-                        <span>{Math.round(((courseProgress?.completedLessons || 0) / (courseProgress?.totalLessons || 1)) * 100)}%</span>
+                      <CardTitle className="text-lg">{module.title}</CardTitle>
+                      <CardDescription>{module.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Clock className="h-4 w-4" />
+                          {module.estimated_time_minutes} min
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-yellow-600">
+                          <Star className="h-4 w-4" />
+                          {module.points_reward} pts
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-primary h-2 rounded-full"
-                          style={{ 
-                            width: `${((courseProgress?.completedLessons || 0) / (courseProgress?.totalLessons || 1)) * 100}%` 
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                    
-                    <Link to="/course">
-                      <Button className="w-full">
-                        Continuar Assistindo
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                      
+                      <Link to={`/module/${module.name}`}>
+                        <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
+                          {isCompleted ? 'Refazer Simulação' : 'Iniciar Simulação'}
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Acesso à Comunidade */}
-          <Card className="mt-6">
+          {/* Bonus Course Access */}
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-primary" />
-                Comunidade Data-Driven Minds
+                <ExternalLink className="h-5 w-5 text-primary" />
+                BÔNUS: Formação Analista Estratégico
               </CardTitle>
               <CardDescription>
-                Conecte-se com outros analistas estratégicos
+                Acesse seu curso completo na Hotmart
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 mb-2">
-                    Participe de discussões, compartilhe insights e aprenda com outros profissionais.
+                    Curso completo com 4 módulos práticos disponível na área de membros da Hotmart.
                   </p>
-                  <Badge variant="outline">+1.2k membros ativos</Badge>
+                  <Badge variant="outline">Incluído na sua assinatura</Badge>
                 </div>
-                <Button>
-                  Acessar Comunidade
+                <Button className="gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Acessar na Hotmart
                 </Button>
               </div>
             </CardContent>

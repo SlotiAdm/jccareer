@@ -1,12 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, BookOpen, Zap, MessageCircle, Settings, LogOut } from "lucide-react";
+import { Home, Zap, MessageCircle, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Início", href: "/dashboard", icon: Home },
-  { name: "Formação", href: "/course", icon: BookOpen },
-  { name: "Fluxo de Inteligência", href: "/intelligence", icon: Zap },
   { name: "Comunidade", href: "#", icon: MessageCircle },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];

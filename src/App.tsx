@@ -10,8 +10,7 @@ import Auth from "./pages/Auth";
 import Checkout from "./pages/Checkout";
 import Confirmation from "./pages/Confirmation";
 import Dashboard from "./pages/Dashboard";
-import Course from "./pages/Course";
-import Intelligence from "./pages/Intelligence";
+import ModuleTraining from "./pages/ModuleTraining";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -38,18 +37,10 @@ const App = () => (
               } 
             />
             <Route 
-              path="/course" 
+              path="/module/:moduleName" 
               element={
                 <ProtectedRoute requiresActiveSubscription>
-                  <Course />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/intelligence" 
-              element={
-                <ProtectedRoute requiresActiveSubscription>
-                  <Intelligence />
+                  <ModuleTraining />
                 </ProtectedRoute>
               } 
             />
