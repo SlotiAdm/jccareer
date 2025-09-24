@@ -534,6 +534,10 @@ export type Database = {
         Args: { attempt_number: number }
         Returns: unknown
       }
+      check_and_award_badges: {
+        Args: { p_module_name: string; p_user_id: string }
+        Returns: Json
+      }
       check_rate_limit: {
         Args: {
           p_limit_per_hour?: number
@@ -575,6 +579,15 @@ export type Database = {
       }
       start_user_trial: {
         Args: { user_id_param: string }
+        Returns: undefined
+      }
+      update_module_progress: {
+        Args: {
+          p_module_name: string
+          p_score: number
+          p_time_spent: number
+          p_user_id: string
+        }
         Returns: undefined
       }
     }

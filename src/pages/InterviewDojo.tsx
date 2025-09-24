@@ -471,14 +471,10 @@ export default function InterviewDojo() {
                   <Send className="h-4 w-4" />
                 </Button>
                 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsRecording(!isRecording)}
-                  className={isRecording ? "text-red-600" : ""}
-                >
-                  {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </Button>
+                <VoiceRecorder
+                  onTranscription={(text) => setCurrentMessage(prev => prev + (prev ? ' ' : '') + text)}
+                  disabled={isProcessing}
+                />
               </div>
             </div>
             
