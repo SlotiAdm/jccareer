@@ -18,39 +18,54 @@ export type Database = {
         Row: {
           cpf_cnpj: string | null
           created_at: string
+          free_sessions_limit: number | null
+          free_sessions_used: number | null
           full_name: string
           hotmart_transaction_id: string | null
           id: string
+          is_admin: boolean | null
           subscription_end_date: string | null
           subscription_plan: string | null
           subscription_start_date: string | null
           subscription_status: string | null
+          trial_end_date: string | null
+          trial_start_date: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           cpf_cnpj?: string | null
           created_at?: string
+          free_sessions_limit?: number | null
+          free_sessions_used?: number | null
           full_name: string
           hotmart_transaction_id?: string | null
           id?: string
+          is_admin?: boolean | null
           subscription_end_date?: string | null
           subscription_plan?: string | null
           subscription_start_date?: string | null
           subscription_status?: string | null
+          trial_end_date?: string | null
+          trial_start_date?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           cpf_cnpj?: string | null
           created_at?: string
+          free_sessions_limit?: number | null
+          free_sessions_used?: number | null
           full_name?: string
           hotmart_transaction_id?: string | null
           id?: string
+          is_admin?: boolean | null
           subscription_end_date?: string | null
           subscription_plan?: string | null
           subscription_start_date?: string | null
           subscription_status?: string | null
+          trial_end_date?: string | null
+          trial_start_date?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -230,7 +245,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_trial_status: {
+        Args: { user_id_param: string }
+        Returns: string
+      }
+      start_user_trial: {
+        Args: { user_id_param: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
