@@ -2,6 +2,33 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Input sanitization functions
+function sanitizeUserInput(input: string): { sanitized: string; warnings: string[] } {
+  const warnings: string[] = [];
+  let sanitized = input;
+
+  // Check for suspicious patterns
+  const suspiciousPatterns = [
+    /ignore\s+(previous|all)\s+instructions/gi,
+    /system\s*:?\s*you\s+are/gi,
+    /<script[\s\S]*?<\/script>/gi,
+    /javascript:/gi,
+    /on\w+\s*=/gi
+  ];
+
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(sanitized)) {
+      warnings.push('Suspicious pattern detected');
+      break;
+    }
+  }
+
+  // Basic sanitization
+  sanitized = sanitized.replace(/[<>]/g, '').substring(0, 5000);
+  
+  return { sanitized, warnings };
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -19,25 +46,42 @@ serve(async (req) => {
       throw new Error('Problema de negócio é obrigatório');
     }
 
+    // Sanitize inputs
+    const sanitizedProblem = sanitizeUserInput(business_problem).sanitized;
+    const sanitizedSolution = user_solution ? sanitizeUserInput(user_solution).sanitized : null;
+
+    // Rate limiting check
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (user_id) {
+      const { data: rateLimitCheck } = await supabase.rpc('check_rate_limit', {
+        p_user_id: user_id,
+        p_module_name: 'erp_simulator',
+        p_limit_per_hour: 20
+      });
+
+      if (!rateLimitCheck) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+    }
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    console.log('ERP simulation for problem:', business_problem);
+    console.log('ERP simulation for problem:', sanitizedProblem.substring(0, 100));
 
     const prompt = `
     Você é um especialista em sistemas ERP e processos empresariais. Analise o problema de negócio apresentado e forneça orientação sobre como usar um ERP para solucioná-lo.
 
     PROBLEMA DE NEGÓCIO:
-    ${business_problem}
+    ${sanitizedProblem}
 
-    ${user_solution ? `\nSOLUÇÃO PROPOSTA PELO USUÁRIO:
-    ${user_solution}` : ''}
+    ${sanitizedSolution ? `\nSOLUÇÃO PROPOSTA PELO USUÁRIO:
+    ${sanitizedSolution}` : ''}
 
     Forneça uma análise detalhada seguindo EXATAMENTE este formato JSON:
 
@@ -144,7 +188,7 @@ serve(async (req) => {
             user_id,
             module_id: moduleData.id,
             session_type: 'erp_simulation',
-            input_data: { business_problem, user_solution },
+            input_data: { business_problem: sanitizedProblem, user_solution: sanitizedSolution },
             ai_response: analysis,
             score: analysis.user_solution_feedback?.accuracy_score || null,
             completed: true

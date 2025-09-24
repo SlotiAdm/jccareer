@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Star, Trophy, Clock, ExternalLink, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Crown, Zap } from "lucide-react";
+import { Trophy, Clock, ExternalLink, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Crown, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import ProgressTracker from "@/components/ProgressTracker";
 import SessionHistory from "@/components/SessionHistory";
+import { BadgeDisplay } from "@/components/BadgeDisplay";
+import { useGameification } from "@/hooks/useGameification";
 
 interface TrainingModule {
   id: string;
@@ -38,6 +40,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [modules, setModules] = useState<TrainingModule[]>([]);
   const [loading, setLoading] = useState(true);
+  const { badges, getOverallStats } = useGameification();
 
   const getIcon = (iconName: string) => {
     const icons = {
@@ -99,7 +102,7 @@ export default function Dashboard() {
 
     const icons = {
       admin: Crown,
-      active: Star,
+      active: Trophy,
       trial: Clock,
       free: Zap,
       expired: Clock
@@ -188,7 +191,6 @@ export default function Dashboard() {
                             <p className="text-sm text-gray-600 mb-4 line-clamp-2">{module.description}</p>
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-4 text-xs text-gray-500">
-                                <span>🎯 Nível {module.difficulty_level}</span>
                                 <span>⏱️ {module.estimated_time_minutes}min</span>
                                 <span>💎 {module.points_reward}pts</span>
                               </div>
@@ -223,9 +225,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Session History */}
-            <div className="lg:col-span-1">
+            {/* Session History and Badges */}
+            <div className="lg:col-span-1 space-y-6">
               <SessionHistory />
+              <BadgeDisplay badges={badges} />
             </div>
           </div>
 

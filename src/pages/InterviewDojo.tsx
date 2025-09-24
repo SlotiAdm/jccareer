@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, MessageSquare, Mic, MicOff, Send, Bot, User, Clock, Target, Star } from "lucide-react";
+import { ArrowLeft, MessageSquare, Send, Bot, User, Clock, Target, Star } from "lucide-react";
+import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
@@ -41,7 +42,6 @@ export default function InterviewDojo() {
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [interviewEnded, setInterviewEnded] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

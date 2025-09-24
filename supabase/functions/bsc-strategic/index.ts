@@ -2,6 +2,49 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Input sanitization functions
+function sanitizeUserInput(input: string): { sanitized: string; warnings: string[] } {
+  const warnings: string[] = [];
+  let sanitized = input;
+
+  // Check for suspicious patterns
+  const suspiciousPatterns = [
+    /ignore\s+(previous|all)\s+instructions/gi,
+    /system\s*:?\s*you\s+are/gi,
+    /<script[\s\S]*?<\/script>/gi,
+    /javascript:/gi,
+    /on\w+\s*=/gi
+  ];
+
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(sanitized)) {
+      warnings.push('Suspicious pattern detected');
+      break;
+    }
+  }
+
+  // Basic sanitization
+  sanitized = sanitized.replace(/[<>]/g, '').substring(0, 5000);
+  
+  return { sanitized, warnings };
+}
+
+function sanitizeStructuredInput(data: any): any {
+  if (typeof data === 'string') {
+    return sanitizeUserInput(data).sanitized;
+  } else if (Array.isArray(data)) {
+    return data.slice(0, 10).map(sanitizeStructuredInput);
+  } else if (data && typeof data === 'object') {
+    const sanitized: any = {};
+    const keys = Object.keys(data).slice(0, 20);
+    for (const key of keys) {
+      sanitized[key] = sanitizeStructuredInput(data[key]);
+    }
+    return sanitized;
+  }
+  return data;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -19,31 +62,48 @@ serve(async (req) => {
       throw new Error('Informações da empresa e objetivos estratégicos são obrigatórios');
     }
 
+    // Sanitize inputs
+    const sanitizedCompanyInfo = sanitizeStructuredInput(company_info);
+    const sanitizedObjectives = sanitizeStructuredInput(strategic_objectives);
+
+    // Rate limiting check
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (user_id) {
+      const { data: rateLimitCheck } = await supabase.rpc('check_rate_limit', {
+        p_user_id: user_id,
+        p_module_name: 'bsc_strategic',
+        p_limit_per_hour: 20
+      });
+
+      if (!rateLimitCheck) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+    }
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    console.log('BSC Strategic creation for company:', company_info.name);
+    console.log('BSC Strategic creation for company:', sanitizedCompanyInfo.name);
 
     const prompt = `
     Você é um consultor estratégico especializado em Balanced Scorecard (BSC). Ajude a criar um BSC completo e bem estruturado.
 
     INFORMAÇÕES DA EMPRESA:
-    ${JSON.stringify(company_info, null, 2)}
+    ${JSON.stringify(sanitizedCompanyInfo, null, 2)}
 
     OBJETIVOS ESTRATÉGICOS INICIAIS:
-    ${JSON.stringify(strategic_objectives, null, 2)}
+    ${JSON.stringify(sanitizedObjectives, null, 2)}
 
     Forneça um Balanced Scorecard completo seguindo EXATAMENTE este formato JSON:
 
     {
       "bsc_overview": {
-        "company_name": "${company_info.name || 'Empresa'}",
+        "company_name": "${sanitizedCompanyInfo.name || 'Empresa'}",
         "industry": "setor identificado",
         "strategic_focus": "foco estratégico principal",
         "time_horizon": "horizonte temporal recomendado"
@@ -222,7 +282,7 @@ serve(async (req) => {
             user_id,
             module_id: moduleData.id,
             session_type: 'bsc_creation',
-            input_data: { company_info, strategic_objectives },
+            input_data: { company_info: sanitizedCompanyInfo, strategic_objectives: sanitizedObjectives },
             ai_response: analysis,
             score: analysis.strategic_alignment?.alignment_score || null,
             completed: true
