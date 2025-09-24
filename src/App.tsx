@@ -15,7 +15,17 @@ import InterviewDojo from "./pages/InterviewDojo";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Configurar QueryClient com otimizações de performance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutos
+      gcTime: 10 * 60 * 1000, // 10 minutos (antes era cacheTime)
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -29,16 +39,20 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/confirmation" element={<Confirmation />} />
+            
+            {/* Dashboard com proteção flexível */}
             <Route 
               path="/dashboard" 
               element={
-                <ProtectedRoute requiresActiveSubscription>
+                <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
               } 
             />
+            
+            {/* Módulos com verificação de acesso */}
             <Route 
-              path="/module/:moduleName" 
+              path="/training/:moduleName" 
               element={
                 <ProtectedRoute requiresActiveSubscription>
                   <ModuleTraining />
@@ -53,6 +67,8 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            
+            {/* Settings sempre acessível para usuários logados */}
             <Route 
               path="/settings" 
               element={
@@ -61,7 +77,11 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            
+            {/* Rotas de compatibilidade */}
+            <Route path="/module/:moduleName" element={<ModuleTraining />} />
+            
+            {/* 404 catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

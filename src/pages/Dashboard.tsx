@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { useTrialAccess } from "@/hooks/useTrialAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Star, Trophy, Clock, ExternalLink, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation } from "lucide-react";
+import { Star, Trophy, Clock, ExternalLink, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Crown, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import ProgressTracker from "@/components/ProgressTracker";
 import SessionHistory from "@/components/SessionHistory";
@@ -33,6 +34,7 @@ interface UserProgress {
 
 export default function Dashboard() {
   const { profile } = useAuth();
+  const trialAccess = useTrialAccess();
   const navigate = useNavigate();
   const [modules, setModules] = useState<TrainingModule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,15 +87,32 @@ export default function Dashboard() {
     return levels.find(level => points >= level.min && points <= level.max) || levels[0];
   };
 
-  const getDifficultyColor = (level: number) => {
+  const getStatusBadge = () => {
+    const info = trialAccess.getRemainingInfo();
     const colors = {
-      1: "bg-green-100 text-green-800",
-      2: "bg-blue-100 text-blue-800", 
-      3: "bg-yellow-100 text-yellow-800",
-      4: "bg-orange-100 text-orange-800",
-      5: "bg-red-100 text-red-800"
+      admin: "bg-purple-100 text-purple-800 border-purple-200",
+      active: "bg-green-100 text-green-800 border-green-200", 
+      trial: "bg-blue-100 text-blue-800 border-blue-200",
+      free: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      expired: "bg-red-100 text-red-800 border-red-200"
     };
-    return colors[level as keyof typeof colors] || colors[1];
+
+    const icons = {
+      admin: Crown,
+      active: Star,
+      trial: Clock,
+      free: Zap,
+      expired: Clock
+    };
+
+    const IconComponent = icons[info.type] || Clock;
+
+    return (
+      <Badge className={`gap-2 ${colors[info.type] || colors.expired}`}>
+        <IconComponent className="w-3 h-3" />
+        {info.message}
+      </Badge>
+    );
   };
 
   if (loading) {
@@ -114,12 +133,17 @@ export default function Dashboard() {
       <main className="flex-1 ml-64 overflow-y-auto">
         <div className="p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Bem-vindo de volta, {profile?.full_name}!
-            </h1>
-            <p className="text-gray-600 mb-6">
-              Continue seu treinamento estratégico no Terminal
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  Bem-vindo de volta, {profile?.full_name}!
+                </h1>
+                <p className="text-gray-600">
+                  Continue seu treinamento estratégico no Terminal
+                </p>
+              </div>
+              {getStatusBadge()}
+            </div>
           </div>
 
           {/* Progress Tracker Component */}
@@ -132,17 +156,37 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {modules.map((module) => {
                   const IconComponent = getIcon(module.icon);
+                  const canAccess = trialAccess.canAccessModule();
+                  const isLocked = !canAccess && trialAccess.status !== 'loading';
+                  
                   return (
-                    <Card key={module.id} className="group hover:shadow-lg transition-all duration-200 cursor-pointer border-2 hover:border-primary/20">
+                    <Card key={module.id} className={`group transition-all duration-200 cursor-pointer border-2 ${
+                      isLocked 
+                        ? 'opacity-60 border-gray-200 hover:border-gray-300' 
+                        : 'hover:shadow-lg hover:border-primary/20'
+                    }`}>
                       <CardContent className="p-6">
                         <div className="flex items-start gap-4">
-                          <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                            <IconComponent className="h-6 w-6 text-primary" />
+                          <div className={`p-3 rounded-lg transition-colors ${
+                            isLocked 
+                              ? 'bg-gray-100' 
+                              : 'bg-primary/10 group-hover:bg-primary/20'
+                          }`}>
+                            <IconComponent className={`h-6 w-6 ${
+                              isLocked ? 'text-gray-400' : 'text-primary'
+                            }`} />
                           </div>
                           <div className="flex-1">
-                            <h3 className="font-semibold text-gray-900 mb-2">{module.title}</h3>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-gray-900">{module.title}</h3>
+                              {isLocked && (
+                                <Badge variant="outline" className="text-xs">
+                                  Bloqueado
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-gray-600 mb-4 line-clamp-2">{module.description}</p>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-4 text-xs text-gray-500">
                                 <span>🎯 Nível {module.difficulty_level}</span>
                                 <span>⏱️ {module.estimated_time_minutes}min</span>
@@ -150,8 +194,10 @@ export default function Dashboard() {
                               </div>
                             </div>
                             <Button 
-                              className="w-full mt-4" 
+                              className="w-full" 
+                              disabled={isLocked}
                               onClick={() => {
+                                if (isLocked) return;
                                 if (module.name === 'interview_dojo') {
                                   navigate('/interview-dojo');
                                 } else {
@@ -159,7 +205,7 @@ export default function Dashboard() {
                                 }
                               }}
                             >
-                              Iniciar Módulo
+                              {isLocked ? 'Acesso Bloqueado' : 'Iniciar Módulo'}
                             </Button>
                           </div>
                         </div>

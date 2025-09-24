@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Upload, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Loader2, Trophy } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useTrialAccess } from "@/hooks/useTrialAccess";
 import { useProgressTracking } from "@/hooks/useProgressTracking";
-import ModuleStats from "@/components/ModuleStats";
+import { supabase } from "@/integrations/supabase/client";
+import { Sidebar } from "@/components/Sidebar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertCircle, CheckCircle, Clock, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Send, RefreshCw, ArrowLeft, Lock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TrainingModule {
   id: string;
@@ -26,37 +25,29 @@ interface TrainingModule {
   points_reward: number;
 }
 
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  score?: number;
+  feedback?: string;
+}
+
 export default function ModuleTraining() {
   const { moduleName } = useParams();
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const { toast } = useToast();
+  const { user, profile } = useAuth();
+  const trialAccess = useTrialAccess();
   const { updateProgress } = useProgressTracking();
+  const { toast } = useToast();
   
   const [module, setModule] = useState<TrainingModule | null>(null);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  
-  // Form states for different modules
-  const [curriculumText, setCurriculumText] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-  const [interviewType, setInterviewType] = useState("behavioral");
-  const [communicationScenario, setCommunicationScenario] = useState("email_to_director");
-  const [communicationText, setCommunicationText] = useState("");
-  const [careerHistory, setCareerHistory] = useState("");
-  const [skills, setSkills] = useState("");
-  const [longTermGoal, setLongTermGoal] = useState("");
-  const [timelineYears, setTimelineYears] = useState(3);
-  
-  // New states for additional modules
-  const [businessProblem, setBusinessProblem] = useState("");
-  const [userSolution, setUserSolution] = useState("");
-  const [challengeType, setChallengeType] = useState("formula_calculation");
-  const [userFormula, setUserFormula] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [strategicObjectives, setStrategicObjectives] = useState("");
+  const [simulationRunning, setSimulationRunning] = useState(false);
+  const [userInput, setUserInput] = useState("");
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [canAccess, setCanAccess] = useState(false);
 
   const getIcon = (iconName: string) => {
     const icons = {
@@ -71,20 +62,57 @@ export default function ModuleTraining() {
     return icons[iconName as keyof typeof icons] || FileText;
   };
 
+  const getFunctionName = (moduleName: string): string => {
+    const functionMap: { [key: string]: string } = {
+      'curriculum_analysis': 'curriculum-analysis',
+      'communication_lab': 'communication-lab',
+      'erp_simulator': 'erp-simulator',
+      'spreadsheet_arena': 'spreadsheet-arena',
+      'bsc_strategic': 'bsc-strategic',
+      'career_gps': 'career-gps'
+    };
+    return functionMap[moduleName] || moduleName;
+  };
+
+  const getWelcomeMessage = (module: TrainingModule): string => {
+    const messages = {
+      'curriculum_analysis': 'Olá! Sou seu assistente de análise curricular. Vou ajudá-lo a otimizar seu currículo para conseguir mais entrevistas.',
+      'communication_lab': 'Bem-vindo ao Laboratório de Comunicação! Vamos praticar suas habilidades de comunicação corporativa.',
+      'erp_simulator': 'Bem-vindo ao Simulador ERP! Aqui você vai dominar os principais sistemas de gestão empresarial.',
+      'spreadsheet_arena': 'Olá! Bem-vindo à Arena de Planilhas! Vamos aprimorar suas habilidades em Excel e análise de dados.',
+      'bsc_strategic': 'Bem-vindo ao BSC Estratégico! Vamos construir indicadores de performance e dashboards estratégicos.',
+      'career_gps': 'Olá! Sou seu GPS de Carreira. Vamos planejar sua trajetória profissional de forma estratégica.'
+    };
+    return messages[module.name as keyof typeof messages] || `Bem-vindo ao módulo ${module.title}!`;
+  };
+
   useEffect(() => {
     const fetchModule = async () => {
+      if (!moduleName) return;
+      
       try {
-        const { data: moduleData } = await supabase
+        setLoading(true);
+        
+        // Verificar acesso
+        const hasAccess = trialAccess.canAccessModule();
+        setCanAccess(hasAccess);
+        
+        const { data: moduleData, error } = await supabase
           .from('training_modules')
           .select('*')
           .eq('name', moduleName)
           .eq('is_active', true)
           .single();
 
+        if (error) throw error;
+        
         if (moduleData) {
           setModule(moduleData);
-        } else {
-          navigate('/dashboard');
+          setConversation([{
+            role: 'assistant',
+            content: getWelcomeMessage(moduleData),
+            timestamp: new Date().toISOString()
+          }]);
         }
       } catch (error) {
         console.error('Error fetching module:', error);
@@ -94,960 +122,218 @@ export default function ModuleTraining() {
       }
     };
 
-    if (moduleName) {
-      fetchModule();
-    }
-  }, [moduleName, navigate]);
+    fetchModule();
+  }, [moduleName, navigate, trialAccess]);
 
-  const handleCurriculumAnalysis = async () => {
-    if (!curriculumText) {
+  const startSimulation = async () => {
+    if (!module || !user || !canAccess) return;
+    
+    const canUseSession = await trialAccess.useSession();
+    if (!canUseSession) {
       toast({
-        title: "Erro",
-        description: "Por favor, insira o texto do currículo",
-        variant: "destructive",
+        title: "Limite atingido",
+        description: "Faça upgrade para continuar usando o Terminal.",
+        variant: "destructive"
       });
+      navigate('/checkout');
       return;
     }
 
-    setProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('curriculum-analysis', {
-        body: {
-          curriculum_text: curriculumText,
-          job_description: jobDescription,
-          user_id: profile?.user_id
+      setSimulationRunning(true);
+      
+      const startMessage: ConversationMessage = {
+        role: 'user',
+        content: userInput,
+        timestamp: new Date().toISOString()
+      };
+      
+      setConversation(prev => [...prev, startMessage]);
+      setUserInput("");
+
+      const functionName = getFunctionName(module.name);
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { 
+          userInput,
+          conversationHistory: conversation,
+          moduleContext: module
         }
       });
 
       if (error) throw error;
+
+      const aiResponse: ConversationMessage = {
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date().toISOString(),
+        score: data.score,
+        feedback: data.feedback
+      };
       
-      setResult(data.analysis);
-      
-      // Update progress
-      if (data.analysis?.overall_score && module) {
+      setConversation(prev => [...prev, aiResponse]);
+
+      if (data.score !== undefined) {
         await updateProgress({
           moduleId: module.id,
-          score: data.analysis.overall_score,
-          completionData: { analysis: data.analysis }
+          score: data.score,
+          completionData: { conversation, finalScore: data.score }
         });
       }
-      
+
+    } catch (error) {
+      console.error('Error running simulation:', error);
       toast({
-        title: "Análise concluída!",
-        description: "Seu currículo foi analisado com sucesso.",
-      });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro na análise",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
+        title: "Erro na simulação", 
+        description: "Tente novamente.",
+        variant: "destructive"
       });
     } finally {
-      setProcessing(false);
+      setSimulationRunning(false);
     }
-  };
-
-  const handleCommunicationAnalysis = async () => {
-    if (!communicationText) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira o texto para análise",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('communication-lab', {
-        body: {
-          scenario: communicationScenario,
-          user_text: communicationText,
-          user_id: profile?.user_id
-        }
-      });
-
-      if (error) throw error;
-      
-      setResult(data.analysis);
-      // Update progress
-      if (data.analysis?.overall_score && module) {
-        await updateProgress({
-          moduleId: module.id,
-          score: data.analysis.overall_score,
-          completionData: { analysis: data.analysis }
-        });
-      }
-      
-      toast({
-        title: "Análise concluída!",
-        description: "Seu texto foi analisado e melhorado.",
-      });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro na análise",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleCareerAnalysis = async () => {
-    if (!careerHistory || !longTermGoal) {
-      toast({
-        title: "Erro",
-        description: "Por favor, preencha o histórico de carreira e objetivo",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('career-gps', {
-        body: {
-          career_history: careerHistory,
-          skills,
-          long_term_goal: longTermGoal,
-          timeline_years: timelineYears,
-          user_id: profile?.user_id
-        }
-      });
-
-      if (error) throw error;
-      
-      setResult(data.analysis);
-      // Update progress
-      if (data.analysis?.viability_score && module) {
-        await updateProgress({
-          moduleId: module.id,
-          score: data.analysis.viability_score,
-          completionData: { analysis: data.analysis }
-        });
-      }
-      
-      toast({
-        title: "Análise concluída!",
-        description: "Seu plano de carreira foi gerado.",
-      });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro na análise",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleERPSimulation = async () => {
-    if (!businessProblem) {
-      toast({
-        title: "Erro",
-        description: "Por favor, descreva o problema de negócio",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('erp-simulator', {
-        body: {
-          business_problem: businessProblem,
-          user_solution: userSolution,
-          user_id: profile?.user_id
-        }
-      });
-
-      if (error) throw error;
-      
-      setResult(data.analysis);
-      toast({
-        title: "Simulação concluída!",
-        description: "Análise de ERP gerada com sucesso.",
-      });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro na simulação",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleSpreadsheetChallenge = async () => {
-    if (!userFormula) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira sua fórmula ou abordagem",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('spreadsheet-arena', {
-        body: {
-          challenge_type: challengeType,
-          user_formula: userFormula,
-          user_approach: userFormula,
-          user_id: profile?.user_id
-        }
-      });
-
-      if (error) throw error;
-      
-      setResult(data.analysis);
-      toast({
-        title: "Desafio concluído!",
-        description: "Sua solução foi avaliada.",
-      });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro na avaliação",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleBSCCreation = async () => {
-    if (!strategicObjectives) {
-      toast({
-        title: "Erro",
-        description: "Por favor, descreva os objetivos estratégicos",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('bsc-strategic', {
-        body: {
-          company_info: {
-            name: companyName || 'Empresa',
-            industry: industry || 'Geral'
-          },
-          strategic_objectives: strategicObjectives,
-          user_id: profile?.user_id
-        }
-      });
-
-      if (error) throw error;
-      
-      setResult(data.analysis);
-      toast({
-        title: "BSC criado!",
-        description: "Seu Balanced Scorecard foi gerado.",
-      });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro na criação",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const renderResultsDisplay = () => {
-    if (!result) return null;
-
-    switch (module?.name) {
-      case 'curriculum_analysis':
-        return (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Análise do Currículo
-                <Badge variant="secondary" className="ml-auto">
-                  Score: {result.overall_score}/100
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold text-green-700 mb-2">✅ Pontos Fortes</h4>
-                  <ul className="space-y-1">
-                    {result.strengths?.map((strength: string, index: number) => (
-                      <li key={index} className="text-sm text-gray-700">• {strength}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-orange-700 mb-2">⚡ Melhorias</h4>
-                  <ul className="space-y-1">
-                    {result.weaknesses?.map((weakness: string, index: number) => (
-                      <li key={index} className="text-sm text-gray-700">• {weakness}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              
-              {result.keyword_analysis && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold mb-2">📊 Análise ATS (Score: {result.keyword_analysis.ats_score}/100)</h4>
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-green-600">Palavras presentes:</span>
-                      <p>{result.keyword_analysis.present_keywords?.join(', ')}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-red-600">Palavras ausentes:</span>
-                      <p>{result.keyword_analysis.missing_keywords?.join(', ')}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-
-      case 'communication_lab':
-        return (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Análise de Comunicação
-                <Badge variant="secondary" className="ml-auto">
-                  Score: {result.overall_score}/100
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Tabs defaultValue="analysis">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="analysis">Análise</TabsTrigger>
-                  <TabsTrigger value="improved">Versão Melhorada</TabsTrigger>
-                </TabsList>
-                <TabsContent value="analysis" className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-semibold text-green-700 mb-2">✅ Pontos Fortes</h4>
-                      <ul className="space-y-1">
-                        {result.strengths?.map((strength: string, index: number) => (
-                          <li key={index} className="text-sm text-gray-700">• {strength}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-orange-700 mb-2">🎯 Sugestões</h4>
-                      <ul className="space-y-1">
-                        {result.improvement_suggestions?.map((suggestion: string, index: number) => (
-                          <li key={index} className="text-sm text-gray-700">• {suggestion}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="improved">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">📝 Versão Otimizada</h4>
-                    <p className="text-gray-700 whitespace-pre-line">{result.improved_text}</p>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        );
-
-      case 'career_gps':
-        return (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Navigation className="h-5 w-5" />
-                Plano de Carreira Estratégico
-                <Badge variant="secondary" className="ml-auto">
-                  Viabilidade: {result.viability_score}/100
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="plan">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="plan">Plano de Ação</TabsTrigger>
-                  <TabsTrigger value="gaps">Gaps</TabsTrigger>
-                  <TabsTrigger value="timeline">Cronograma</TabsTrigger>
-                </TabsList>
-                <TabsContent value="plan" className="space-y-4">
-                  {result.action_plan?.steps?.map((step: any, index: number) => (
-                    <div key={index} className="border-l-4 border-primary pl-4">
-                      <h4 className="font-semibold">{step.title}</h4>
-                      <p className="text-gray-700 text-sm">{step.description}</p>
-                      <span className="text-xs text-gray-500">Prazo: {step.timeframe}</span>
-                    </div>
-                  ))}
-                </TabsContent>
-                <TabsContent value="gaps">
-                  <div className="space-y-3">
-                    {result.skill_gaps?.map((gap: string, index: number) => (
-                      <div key={index} className="p-3 bg-yellow-50 rounded-lg">
-                        <span className="text-sm">• {gap}</span>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-                <TabsContent value="timeline">
-                  <div className="space-y-3">
-                    {result.milestone_timeline?.map((milestone: any, index: number) => (
-                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                        <Badge>{milestone.timeframe}</Badge>
-                        <span className="text-sm">{milestone.milestone}</span>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        );
-
-      default:
-        return (
-          <Card className="mt-6">
-            <CardContent className="p-6">
-              <pre className="text-sm bg-gray-100 p-4 rounded-lg overflow-auto">
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
-        );
-    }
-  };
-
-  const renderModuleInterface = () => {
-    if (!module) return null;
-
-    switch (module.name) {
-      case 'curriculum_analysis':
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="curriculum">Texto do Currículo *</Label>
-                <Textarea
-                  id="curriculum"
-                  placeholder="Cole aqui o texto completo do seu currículo..."
-                  value={curriculumText}
-                  onChange={(e) => setCurriculumText(e.target.value)}
-                  rows={8}
-                  className="mt-2"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="job-desc">Descrição da Vaga (Opcional)</Label>
-                <Textarea
-                  id="job-desc"
-                  placeholder="Cole a descrição da vaga para análise comparativa..."
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                  rows={4}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleCurriculumAnalysis}
-              disabled={processing || !curriculumText}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                'Analisar Currículo'
-              )}
-            </Button>
-          </div>
-        );
-
-      case 'communication_lab':
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="scenario">Cenário</Label>
-                <select
-                  id="scenario"
-                  value={communicationScenario}
-                  onChange={(e) => setCommunicationScenario(e.target.value)}
-                  className="mt-2 w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="email_to_director">E-mail para diretor pedindo recursos</option>
-                  <option value="negative_results_presentation">Apresentar resultados negativos</option>
-                  <option value="client_proposal">Proposta para cliente</option>
-                  <option value="team_feedback">Feedback para equipe</option>
-                  <option value="project_update">Atualização de projeto</option>
-                </select>
-              </div>
-              
-              <div>
-                <Label htmlFor="text">Seu Texto *</Label>
-                <Textarea
-                  id="text"
-                  placeholder="Escreva aqui o texto que deseja analisar e melhorar..."
-                  value={communicationText}
-                  onChange={(e) => setCommunicationText(e.target.value)}
-                  rows={8}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleCommunicationAnalysis}
-              disabled={processing || !communicationText}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                'Analisar Comunicação'
-              )}
-            </Button>
-          </div>
-        );
-
-      case 'career_gps':
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="career-history">Histórico de Carreira *</Label>
-                <Textarea
-                  id="career-history"
-                  placeholder="Descreva sua trajetória profissional: cargos, empresas, principais conquistas..."
-                  value={careerHistory}
-                  onChange={(e) => setCareerHistory(e.target.value)}
-                  rows={6}
-                  className="mt-2"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="skills">Competências Atuais</Label>
-                <Textarea
-                  id="skills"
-                  placeholder="Liste suas principais competências técnicas e comportamentais..."
-                  value={skills}
-                  onChange={(e) => setSkills(e.target.value)}
-                  rows={4}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="goal">Objetivo de Longo Prazo *</Label>
-                <Input
-                  id="goal"
-                  placeholder="Ex: Tornar-me Gerente de Estratégia"
-                  value={longTermGoal}
-                  onChange={(e) => setLongTermGoal(e.target.value)}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="timeline">Prazo (anos)</Label>
-                <Input
-                  id="timeline"
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={timelineYears}
-                  onChange={(e) => setTimelineYears(parseInt(e.target.value))}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleCareerAnalysis}
-              disabled={processing || !careerHistory || !longTermGoal}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                'Gerar Plano de Carreira'
-              )}
-            </Button>
-          </div>
-        );
-
-      case 'erp_simulator':
-        return (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h4 className="font-semibold text-blue-900 mb-2">Cenário de Negócio</h4>
-              <p className="text-blue-800 text-sm">
-                Você é um analista e precisa extrair informações de um ERP para resolver problemas de negócio.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="business-problem">Problema de Negócio *</Label>
-                <Textarea
-                  id="business-problem"
-                  placeholder="Ex: Preciso gerar um relatório de vendas do último trimestre por região, excluindo devoluções..."
-                  value={businessProblem}
-                  onChange={(e) => setBusinessProblem(e.target.value)}
-                  rows={6}
-                  className="mt-2"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="user-solution">Sua Abordagem (Opcional)</Label>
-                <Textarea
-                  id="user-solution"
-                  placeholder="Descreva como você resolveria este problema no ERP..."
-                  value={userSolution}
-                  onChange={(e) => setUserSolution(e.target.value)}
-                  rows={4}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleERPSimulation}
-              disabled={processing || !businessProblem}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                'Simular ERP'
-              )}
-            </Button>
-          </div>
-        );
-
-      case 'spreadsheet_arena':
-        return (
-          <div className="space-y-6">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-              <h4 className="font-semibold text-green-900 mb-2">Arena de Desafios</h4>
-              <p className="text-green-800 text-sm">
-                Escolha um desafio e mostre suas habilidades em planilhas!
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="challenge-type">Tipo de Desafio</Label>
-                <select
-                  id="challenge-type"
-                  value={challengeType}
-                  onChange={(e) => setChallengeType(e.target.value)}
-                  className="mt-2 w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="formula_calculation">Cálculo com Fórmulas</option>
-                  <option value="pivot_analysis">Análise com Tabela Dinâmica</option>
-                  <option value="conditional_formatting">Formatação Condicional</option>
-                </select>
-              </div>
-              
-              <div>
-                <Label htmlFor="user-formula">Sua Fórmula/Abordagem *</Label>
-                <Textarea
-                  id="user-formula"
-                  placeholder="Ex: =AVERAGEIFS(C:C, A:A, 'Norte', B:B, '<>Beta') ou descreva sua abordagem..."
-                  value={userFormula}
-                  onChange={(e) => setUserFormula(e.target.value)}
-                  rows={4}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleSpreadsheetChallenge}
-              disabled={processing || !userFormula}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                'Avaliar Solução'
-              )}
-            </Button>
-          </div>
-        );
-
-      case 'bsc_strategic':
-        return (
-          <div className="space-y-6">
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-              <h4 className="font-semibold text-purple-900 mb-2">Balanced Scorecard</h4>
-              <p className="text-purple-800 text-sm">
-                Vamos criar um BSC completo para sua empresa com as 4 perspectivas estratégicas.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="company-name">Nome da Empresa</Label>
-                <Input
-                  id="company-name"
-                  placeholder="Ex: TechCorp Soluções"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="industry">Setor de Atuação</Label>
-                <Input
-                  id="industry"
-                  placeholder="Ex: Tecnologia, Varejo, Consultoria..."
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  className="mt-2"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="strategic-objectives">Objetivos Estratégicos *</Label>
-                <Textarea
-                  id="strategic-objectives"
-                  placeholder="Descreva os principais objetivos estratégicos da empresa: crescimento, rentabilidade, satisfação do cliente, inovação..."
-                  value={strategicObjectives}
-                  onChange={(e) => setStrategicObjectives(e.target.value)}
-                  rows={6}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleBSCCreation}
-              disabled={processing || !strategicObjectives}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Criando BSC...
-                </>
-              ) : (
-                'Gerar Balanced Scorecard'
-              )}
-            </Button>
-          </div>
-        );
-    }
-  };
-
-  const renderResults = () => {
-    if (!result) return null;
-
-    return (
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Resultado da Análise</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-              <TabsTrigger value="details">Detalhes</TabsTrigger>
-              <TabsTrigger value="actions">Próximos Passos</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="space-y-4">
-              {module?.name === 'curriculum_analysis' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl font-bold text-primary">{result.overall_score}/100</span>
-                    <Badge className="bg-blue-100 text-blue-800">Score Geral</Badge>
-                  </div>
-                  <p className="text-gray-700">{result.summary}</p>
-                </div>
-              )}
-              
-              {module?.name === 'communication_lab' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl font-bold text-primary">{result.overall_score}/100</span>
-                    <Badge className="bg-green-100 text-green-800">Score de Comunicação</Badge>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">Versão Melhorada:</h4>
-                    <p className="text-gray-700 whitespace-pre-line">{result.improved_version}</p>
-                  </div>
-                </div>
-              )}
-              
-              {module?.name === 'career_gps' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl font-bold text-primary">{result.success_probability}/100</span>
-                    <Badge className="bg-purple-100 text-purple-800">Probabilidade de Sucesso</Badge>
-                  </div>
-                  <p className="text-gray-700">{result.action_plan?.long_term_strategy}</p>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="details" className="space-y-4">
-              <div className="space-y-4">
-                {JSON.stringify(result, null, 2).split('\n').slice(0, 20).map((line, index) => (
-                  <p key={index} className="text-sm font-mono text-gray-600">{line}</p>
-                ))}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="actions" className="space-y-4">
-              <div className="space-y-3">
-                {result.improvement_suggestions?.map((suggestion: string, index: number) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm">
-                      {index + 1}
-                    </span>
-                    <p className="text-gray-700">{suggestion}</p>
-                  </div>
-                )) || result.key_recommendations?.map((rec: string, index: number) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm">
-                      {index + 1}
-                    </span>
-                    <p className="text-gray-700">{rec}</p>
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    );
   };
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        <div className="flex-1 ml-64 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!module) {
-    return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-terminal-light">
         <Sidebar />
         <div className="flex-1 ml-64 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-2">Módulo não encontrado</h2>
-            <Button onClick={() => navigate('/dashboard')}>
-              Voltar ao Dashboard
-            </Button>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-terminal-text">Carregando módulo...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  const IconComponent = getIcon(module.icon);
+  if (!canAccess) {
+    return (
+      <div className="flex h-screen bg-terminal-light">
+        <Sidebar />
+        <div className="flex-1 ml-64 flex items-center justify-center p-8">
+          <Card className="w-full max-w-md text-center">
+            <CardHeader>
+              <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
+                <Lock className="w-8 h-8 text-destructive" />
+              </div>
+              <CardTitle>Acesso Restrito</CardTitle>
+              <CardDescription>
+                {trialAccess.getRemainingInfo().message}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                  Dashboard
+                </Button>
+                <Button onClick={() => navigate('/checkout')}>
+                  Fazer Upgrade
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const IconComponent = module ? getIcon(module.icon) : FileText;
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-terminal-light">
       <Sidebar />
       
-      <main className="flex-1 ml-64 overflow-y-auto">
-        <div className="p-8 max-w-4xl mx-auto">
-          <div className="mb-6">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/dashboard')}
-              className="mb-4"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar ao Dashboard
-            </Button>
-            
-            <div className="flex items-center gap-4 mb-4">
-              <IconComponent className="h-12 w-12 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{module.title}</h1>
-                <p className="text-gray-600">{module.description}</p>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Badge className="bg-blue-100 text-blue-800">
-                Nível {module.difficulty_level}
-              </Badge>
-              <Badge variant="outline">
-                {module.estimated_time_minutes} min
-              </Badge>
-              <Badge className="bg-yellow-100 text-yellow-800">
-                {module.points_reward} pontos
-              </Badge>
+      <main className="flex-1 ml-64 overflow-hidden">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="border-b bg-white p-6">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/dashboard')}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Voltar
+              </Button>
+              
+              {module && (
+                <>
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <IconComponent className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-terminal-text">{module.title}</h1>
+                    <p className="text-muted-foreground">{module.description}</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Simulação Interativa</CardTitle>
-              <CardDescription>
-                Complete os campos abaixo para iniciar sua simulação com IA
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {renderModuleInterface()}
-            </CardContent>
-          </Card>
+          {/* Chat Area */}
+          <div className="flex-1 flex flex-col">
+            <ScrollArea className="flex-1 p-6">
+              <div className="space-y-4 max-w-4xl mx-auto">
+                {conversation.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex gap-4 ${
+                      message.role === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] p-4 rounded-lg ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-white border shadow-sm'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.score && (
+                        <div className="mt-2 pt-2 border-t">
+                          <Badge variant="outline">Score: {message.score}%</Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
 
-          {renderResults()}
+            {/* Input Area */}
+            <div className="border-t bg-white p-6">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex gap-4">
+                  <Textarea
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder="Digite sua mensagem..."
+                    className="min-h-[60px]"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        startSimulation();
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={startSimulation}
+                    disabled={simulationRunning || !userInput.trim()}
+                    className="gap-2"
+                  >
+                    {simulationRunning ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Enviar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
