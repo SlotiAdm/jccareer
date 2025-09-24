@@ -13,6 +13,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, CheckCircle, Clock, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, ArrowLeft, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { handleApiError, ERROR_CODES, BussulaError } from "@/utils/errorHandler";
 
 interface TrainingModule {
   id: string;
@@ -109,9 +111,10 @@ export default function ModuleTraining() {
 
         if (error) {
           console.error('Error fetching module:', error);
+          const bussulaError = handleApiError(error);
           toast({
-            title: "Módulo não encontrado",
-            description: "Este módulo não existe ou está inativo.",
+            title: "Erro ao carregar módulo",
+            description: bussulaError.message,
             variant: "destructive"
           });
           navigate('/dashboard');
@@ -121,14 +124,20 @@ export default function ModuleTraining() {
         if (moduleData) {
           setModule(moduleData);
         } else {
-          console.error('Module not found:', moduleName);
+          const error = new BussulaError(ERROR_CODES.MODULE_NOT_FOUND);
+          toast({
+            title: "Módulo não encontrado",
+            description: error.message,
+            variant: "destructive"
+          });
           navigate('/dashboard');
         }
       } catch (error) {
         console.error('Error fetching module:', error);
+        const bussulaError = handleApiError(error);
         toast({
           title: "Erro ao carregar módulo",
-          description: "Tente novamente em alguns instantes.",
+          description: bussulaError.message,
           variant: "destructive"
         });
         navigate('/dashboard');
@@ -188,11 +197,12 @@ export default function ModuleTraining() {
 
       if (error) {
         console.error('Function error:', error);
-        throw new Error((responseData as any)?.error || error.message || 'Erro na simulação');
+        const bussulaError = handleApiError(error);
+        throw bussulaError;
       }
 
       if (!responseData) {
-        throw new Error('Resposta vazia do servidor');
+        throw new BussulaError(ERROR_CODES.API_ERROR, 'Resposta vazia do servidor');
       }
 
       setResult(responseData);
@@ -214,10 +224,10 @@ export default function ModuleTraining() {
 
     } catch (error) {
       console.error('Error running simulation:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido na simulação';
+      const bussulaError = handleApiError(error);
       toast({
         title: "Erro na simulação", 
-        description: errorMessage,
+        description: bussulaError.message,
         variant: "destructive"
       });
     } finally {
@@ -230,10 +240,7 @@ export default function ModuleTraining() {
       <div className="flex h-screen bg-terminal-light">
         <Sidebar />
         <div className="flex-1 lg:ml-64 flex items-center justify-center pt-16 lg:pt-0">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-terminal-text">Carregando módulo...</p>
-          </div>
+          <LoadingSpinner size="lg" text="Carregando módulo..." />
         </div>
       </div>
     );

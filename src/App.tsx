@@ -1,3 +1,4 @@
+import React, { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,21 +6,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Checkout from "./pages/Checkout";
-import Confirmation from "./pages/Confirmation";
-import Dashboard from "./pages/Dashboard";
-import ModuleTraining from "./pages/ModuleTraining";
-import InterviewDojo from "./pages/InterviewDojo";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import SpreadsheetArenaPage from "./pages/SpreadsheetArenaPage";
-import ErpSimulator from "./pages/ErpSimulator";
-import ErpTraining from "./pages/ErpTraining";
-import ResumeAnalyzer from "./pages/ResumeAnalyzer";
-import CommunicationLab from "./pages/CommunicationLab";
-import BSCStrategic from "./pages/BSCStrategic";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+// Lazy load pages for better performance
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const Confirmation = lazy(() => import("./pages/Confirmation"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ModuleTraining = lazy(() => import("./pages/ModuleTraining"));
+const InterviewDojo = lazy(() => import("./pages/InterviewDojo"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const SpreadsheetArenaPage = lazy(() => import("./pages/SpreadsheetArenaPage"));
+const ErpSimulator = lazy(() => import("./pages/ErpSimulator"));
+const ErpTraining = lazy(() => import("./pages/ErpTraining"));
+const ResumeAnalyzer = lazy(() => import("./pages/ResumeAnalyzer"));
+const CommunicationLab = lazy(() => import("./pages/CommunicationLab"));
+const BSCStrategic = lazy(() => import("./pages/BSCStrategic"));
 
 // Configurar QueryClient com otimizações de performance
 const queryClient = new QueryClient({
@@ -37,10 +42,16 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
+        <ErrorBoundary>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Suspense fallback={
+              <div className="flex h-screen items-center justify-center bg-terminal-light">
+                <LoadingSpinner size="lg" text="Carregando aplicação..." />
+              </div>
+            }>
+              <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/checkout" element={<Checkout />} />
@@ -138,7 +149,9 @@ const App = () => (
             {/* 404 catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+            </Suspense>
         </BrowserRouter>
+        </ErrorBoundary>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

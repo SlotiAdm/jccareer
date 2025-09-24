@@ -1,7 +1,9 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserStore } from "@/store/userStore";
+import { handleApiError, ERROR_CODES } from "@/utils/errorHandler";
 
 interface AuthContextType {
   user: User | null;
@@ -16,11 +18,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const {
+    user, session, profile, loading,
+    setUser, setSession, setProfile, setLoading,
+    reset
+  } = useUserStore();
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -78,9 +81,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) {
+        const bussulaError = handleApiError(error);
         toast({
           title: "Erro no login",
-          description: error.message,
+          description: bussulaError.message,
           variant: "destructive",
         });
       } else {
@@ -92,7 +96,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return { error };
     } catch (error: any) {
-      return { error };
+      const bussulaError = handleApiError(error);
+      toast({
+        title: "Erro no login",
+        description: bussulaError.message,
+        variant: "destructive",
+      });
+      return { error: bussulaError };
     }
   };
 
@@ -112,9 +122,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (error) {
+        const bussulaError = handleApiError(error);
         toast({
           title: "Erro no cadastro",
-          description: error.message,
+          description: bussulaError.message,
           variant: "destructive",
         });
       } else {
@@ -126,19 +137,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       return { error };
     } catch (error: any) {
-      return { error };
+      const bussulaError = handleApiError(error);
+      toast({
+        title: "Erro no cadastro",
+        description: bussulaError.message,
+        variant: "destructive",
+      });
+      return { error: bussulaError };
     }
   };
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
+      reset(); // Reset store state
       toast({
         title: "Logout realizado",
         description: "Até logo!",
       });
     } catch (error) {
       console.error('Error signing out:', error);
+      const bussulaError = handleApiError(error);
+      toast({
+        title: "Erro ao fazer logout",
+        description: bussulaError.message,
+        variant: "destructive",
+      });
     }
   };
 
