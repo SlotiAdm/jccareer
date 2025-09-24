@@ -21,39 +21,57 @@ export const useTrialAccess = () => {
     isAdmin: false
   });
 
-  const checkAccessStatus = useCallback(async () => {
+const checkAccessStatus = useCallback(async () => {
     if (!user) return;
 
     try {
-      const { data: status } = await supabase.rpc('check_trial_status', {
-        user_id_param: user.id
-      });
-
-      const validStatus: TrialData['status'] = ['active', 'trial', 'free', 'expired', 'inactive'].includes(status) 
-        ? status as TrialData['status'] 
-        : 'inactive';
-
-      setTrialData(prev => ({
-        ...prev,
-        status: validStatus
-      }));
-
-      // Buscar dados atualizados do profile
-      const { data: profileData } = await supabase
+      // Buscar dados do perfil e status do trial com logs de segurança
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('free_sessions_used, free_sessions_limit, trial_end_date, is_admin')
+        .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (profileData) {
-        setTrialData(prev => ({
-          ...prev,
-          freeSessionsUsed: profileData.free_sessions_used || 0,
-          freeSessionsLimit: profileData.free_sessions_limit || 3,
-          trialEndDate: profileData.trial_end_date ? new Date(profileData.trial_end_date) : undefined,
-          isAdmin: profileData.is_admin || false
-        }));
+      if (profileError) throw profileError;
+
+      // Determinar status de acesso
+      let status: TrialData['status'] = 'inactive';
+      
+      if (profileData.is_admin) {
+        status = 'active';
+      } else if (profileData.subscription_status === 'active') {
+        status = 'active';
+      } else if (profileData.subscription_status === 'trial' && 
+                 new Date(profileData.trial_end_date) > new Date()) {
+        status = 'trial';
+      } else if (profileData.trial_end_date && 
+                 new Date(profileData.trial_end_date) < new Date()) {
+        // Atualizar status expirado
+        await supabase
+          .from('profiles')
+          .update({ subscription_status: 'expired' })
+          .eq('user_id', user.id);
+        status = 'expired';
+      } else if (profileData.free_sessions_used < profileData.free_sessions_limit) {
+        status = 'free';
       }
+
+      setTrialData(prev => ({
+        ...prev,
+        status,
+        freeSessionsUsed: profileData.free_sessions_used || 0,
+        freeSessionsLimit: profileData.free_sessions_limit || 3,
+        trialEndDate: profileData.trial_end_date ? new Date(profileData.trial_end_date) : undefined,
+        isAdmin: profileData.is_admin || false
+      }));
+
+      // Log de acesso para auditoria
+      await supabase.rpc('log_security_event', {
+        event_type_param: 'access_check',
+        event_data_param: { status, user_id: user.id },
+        user_id_param: user.id
+      });
+
     } catch (error) {
       console.error('Error checking trial access:', error);
       setTrialData(prev => ({ ...prev, status: 'inactive' }));
@@ -66,11 +84,22 @@ export const useTrialAccess = () => {
     return ['active', 'trial', 'free'].includes(trialData.status);
   }, [trialData]);
 
-  const useSession = useCallback(async (): Promise<boolean> => {
+const useSession = useCallback(async (): Promise<boolean> => {
     if (!user || trialData.isAdmin) return true;
     
     // Se tem assinatura ativa ou trial, não consome sessão gratuita
-    if (['active', 'trial'].includes(trialData.status)) return true;
+    if (['active', 'trial'].includes(trialData.status)) {
+      // Log da utilização sem consumir sessão
+      await supabase.rpc('log_security_event', {
+        event_type_param: 'session_access',
+        event_data_param: { 
+          type: 'premium_access', 
+          status: trialData.status 
+        },
+        user_id_param: user.id
+      });
+      return true;
+    }
 
     // Se pode usar sessão gratuita
     if (trialData.status === 'free') {
@@ -84,6 +113,15 @@ export const useTrialAccess = () => {
             ...prev,
             freeSessionsUsed: prev.freeSessionsUsed + 1
           }));
+
+          // Log da sessão consumida
+          await supabase.rpc('log_security_event', {
+            event_type_param: 'free_session_used',
+            event_data_param: { 
+              sessions_remaining: trialData.freeSessionsLimit - trialData.freeSessionsUsed - 1
+            },
+            user_id_param: user.id
+          });
 
           const remaining = trialData.freeSessionsLimit - trialData.freeSessionsUsed - 1;
           if (remaining <= 1) {

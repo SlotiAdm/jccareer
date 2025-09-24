@@ -30,39 +30,78 @@ serve(async (req) => {
 
     console.log('Starting curriculum analysis for user:', user_id);
 
-    const prompt = `
-    Você é um especialista em análise de currículos e recrutamento. Analise o currículo fornecido e forneça uma análise detalhada.
+    // Buscar configuração do módulo
+    const { data: moduleConfig } = await supabase
+      .from('module_configurations')
+      .select('system_prompt, settings')
+      .eq('module_name', 'curriculum_analysis')
+      .single();
 
-    CURRÍCULO:
+    const systemPrompt = moduleConfig?.system_prompt || `
+      Você é um Headhunter de elite e um estrategista de carreira cínico, mas brilhante, alinhado à filosofia do "Mentor Irreverente". 
+      Sua missão é analisar o currículo do usuário sob a ótica das 48 Leis do Poder e da geração de valor tangível. 
+      Ignore clichês corporativos. Foque em: Linguagem de Poder, Métricas de Impacto, Análise de Palavras-Chave e Leis do Poder.
+    `;
+
+    const settings = moduleConfig?.settings || {};
+    const maxTokens = settings.max_tokens || 2000;
+
+    const prompt = `
+    ${systemPrompt}
+
+    CURRÍCULO PARA ANÁLISE:
     ${curriculum_text}
 
-    ${job_description ? `\nDESCRIÇÃO DA VAGA (para comparação):
-    ${job_description}` : ''}
+    ${job_description ? `DESCRIÇÃO DA VAGA DE INTERESSE: ${job_description}` : ''}
 
-    Forneça uma análise estruturada seguindo EXATAMENTE este formato JSON:
+    Forneça uma análise completa seguindo EXATAMENTE este formato JSON:
 
     {
-      "overall_score": (número de 0 a 100),
-      "summary": "Resumo geral do currículo em 2-3 frases",
-      "strengths": ["ponto forte 1", "ponto forte 2", "ponto forte 3"],
-      "weaknesses": ["ponto fraco 1", "ponto fraco 2", "ponto fraco 3"],
-      "impact_analysis": {
-        "current_descriptions": ["descrição atual 1", "descrição atual 2"],
-        "improved_descriptions": ["versão melhorada usando STAR 1", "versão melhorada usando STAR 2"]
+      "overall_score": (0-100),
+      "mentor_verdict": "análise direta e sem filtros do Mentor Irreverente",
+      "power_language_analysis": {
+        "passive_expressions": ["expressão passiva encontrada 1", "expressão passiva 2"],
+        "power_replacements": [
+          {"weak": "fui responsável por", "strong": "liderei iniciativa que gerou"},
+          {"weak": "participei de", "strong": "conduzi projeto que resultou em"}
+        ],
+        "impact_score": (0-100)
       },
-      "keyword_analysis": {
-        "missing_keywords": ["palavra-chave 1", "palavra-chave 2"],
-        "present_keywords": ["palavra-chave presente 1", "palavra-chave presente 2"],
-        "ats_score": (número de 0 a 100)
+      "metrics_audit": {
+        "missing_metrics": ["área sem quantificação 1", "área sem quantificação 2"],
+        "quantifiable_suggestions": [
+          {"area": "vendas", "suggestion": "aumentei vendas em X% ou R$ Y"},
+          {"area": "processos", "suggestion": "reduzi tempo de processo em X%"}
+        ],
+        "metrics_score": (0-100)
       },
-      "improvement_suggestions": [
-        "Sugestão específica 1",
-        "Sugestão específica 2", 
-        "Sugestão específica 3"
+      "keywords_gap_analysis": {
+        "critical_missing": ["palavra-chave crítica 1", "palavra-chave crítica 2"],
+        "present_keywords": ["palavra presente 1", "palavra presente 2"],
+        "strategic_additions": ["adicionar como especialista em X", "enfatizar experiência com Y"],
+        "ats_score": (0-100)
+      },
+      "power_laws_assessment": {
+        "current_positioning": "como o candidato se posiciona atualmente",
+        "law_violations": [
+          {"law": "Lei 28: Seja Audacioso", "violation": "se vende como executor, não estrategista"},
+          {"law": "Lei 11: Torne-se Indispensável", "violation": "não demonstra valor único"}
+        ],
+        "strategic_repositioning": "como se reposicionar estrategicamente",
+        "authority_score": (0-100)
+      },
+      "brutal_feedback": [
+        "verdade desconfortável 1 que precisa ser dita",
+        "verdade desconfortável 2 sobre o mercado",
+        "verdade desconfortável 3 sobre posicionamento"
+      ],
+      "action_plan": [
+        {"priority": "alta", "action": "ação específica e mensurável", "timeline": "prazo"},
+        {"priority": "média", "action": "ação específica", "timeline": "prazo"}
       ]
     }
 
-    Seja específico, construtivo e foque em melhorias acionáveis.
+    Seja direto, acionável e revele verdades que outros não têm coragem de dizer.
     `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -72,16 +111,15 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: [
           { 
             role: 'system', 
-            content: 'You are an expert resume analyst. Always respond with valid JSON following the exact structure requested.' 
+            content: 'Você é o Mentor Irreverente, especialista em estratégia de carreira e análise brutal de currículos. Sempre responda com JSON válido seguindo exatamente a estrutura solicitada.' 
           },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        max_completion_tokens: maxTokens,
       }),
     });
 

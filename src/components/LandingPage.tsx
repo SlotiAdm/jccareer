@@ -1,8 +1,9 @@
-import { CheckCircle, BookOpen, TrendingUp, Users, ArrowRight, Star, Zap, Brain, Target, Cpu, FileText, MessageSquare, Presentation, Database, Table, Navigation, Trophy, Clock } from "lucide-react";
+import { CheckCircle, BookOpen, TrendingUp, Users, ArrowRight, Star, Zap, Brain, Target, Cpu, FileText, MessageSquare, Presentation, Database, Table, Navigation, Trophy, Clock, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { MobileNavigation } from "./MobileNavigation";
 
 const LandingPage = () => {
   const aiModules = [
@@ -66,8 +67,30 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="container mx-auto px-4 py-4 flex items-center justify-between lg:py-6">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <Zap className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span className="text-xl font-bold text-foreground">Terminal</span>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="hidden lg:block">
+            <Link to="/auth">
+              <Button variant="outline" className="flex items-center gap-2">
+                <LogIn className="h-4 w-4" />
+                Entrar
+              </Button>
+            </Link>
+          </div>
+          <MobileNavigation />
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-primary/10 py-20 px-4">
+      <section className="relative overflow-hidden bg-gradient-to-br from-background via-primary/5 to-primary/10 py-12 px-4 lg:py-20">
         <div className="max-w-6xl mx-auto text-center">
           <div className="mb-6 flex justify-center">
             <Badge className="bg-primary/10 text-primary border-primary/20 px-4 py-2 text-sm font-medium">
@@ -75,38 +98,38 @@ const LandingPage = () => {
             </Badge>
           </div>
           
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
             O <span className="text-primary">Terminal</span> dos
             <br />
             Analistas de Elite
           </h1>
           
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
             <strong>7 simuladores de IA</strong> que transformam analistas comuns em 
             <strong> estrategistas de alto impacto</strong>. Treine suas habilidades em um ambiente seguro 
             antes de aplicar no mundo real.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8 lg:mb-12">
             <Link to="/checkout">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-4 text-lg">
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-3 lg:py-4 text-lg w-full sm:w-auto">
                 <Brain className="mr-2 h-5 w-5" />
                 Começar Simulações
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/auth">
-              <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
+              <Button size="lg" variant="outline" className="px-8 py-3 lg:py-4 text-lg w-full sm:w-auto">
                 <Trophy className="mr-2 h-5 w-5" />
                 Login / Demo Gratuita
               </Button>
             </Link>
           </div>
 
-          <div className="flex items-center justify-center gap-8 text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-center gap-4 lg:gap-8 text-sm text-gray-600">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-primary" />
-              <span>Powered by GPT-4</span>
+              <span>Powered by GPT-5</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
@@ -121,27 +144,27 @@ const LandingPage = () => {
       </section>
 
       {/* Módulos de IA */}
-      <section className="py-20 px-4 bg-background">
+      <section className="py-12 px-4 bg-background lg:py-20">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-8 lg:mb-16">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
               7 Simuladores de IA para Dominar a Análise Estratégica
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
               Cada módulo é uma experiência imersiva que desenvolve habilidades específicas. 
               A IA atua como seu mentor pessoal, oferecendo feedback detalhado e orientação personalizada.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {aiModules.map((module, index) => {
               const IconComponent = module.icon;
               return (
-                <Card key={index} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white">
-                  <CardContent className="p-6">
+                <Card key={index} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white h-full">
+                  <CardContent className="p-4 lg:p-6 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-4">
-                      <div className={`w-12 h-12 ${module.color} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                        <IconComponent className="h-6 w-6 text-white" />
+                      <div className={`w-10 h-10 lg:w-12 lg:h-12 ${module.color} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                        <IconComponent className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
                       </div>
                       <div className="flex gap-1">
                         {[...Array(5)].map((_, i) => (
@@ -153,24 +176,24 @@ const LandingPage = () => {
                       </div>
                     </div>
                     
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{module.name}</h3>
-                    <p className="text-gray-600 mb-4">{module.description}</p>
+                    <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-2">{module.name}</h3>
+                    <p className="text-sm lg:text-base text-gray-600 mb-4 flex-grow">{module.description}</p>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-2 mb-4">
                       {module.features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center text-sm">
-                          <CheckCircle className="h-4 w-4 text-primary mr-2 flex-shrink-0" />
+                        <div key={featureIndex} className="flex items-center text-xs lg:text-sm">
+                          <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-primary mr-2 flex-shrink-0" />
                           <span className="text-gray-700">{feature}</span>
                         </div>
                       ))}
                     </div>
                     
-                    <div className="mt-6 pt-4 border-t border-gray-100">
+                    <div className="mt-auto pt-4 border-t border-gray-100">
                       <div className="flex items-center justify-between">
                         <Badge variant="outline" className="text-xs">
                           IA Personalizada
                         </Badge>
-                        <span className="text-sm text-gray-500">Nível {module.difficulty}/5</span>
+                        <span className="text-xs lg:text-sm text-gray-500">Nível {module.difficulty}/5</span>
                       </div>
                     </div>
                   </CardContent>
@@ -179,12 +202,12 @@ const LandingPage = () => {
             })}
           </div>
 
-          <div className="text-center mt-12">
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p6 inline-block">
-              <div className="flex items-center gap-3 text-primary">
+          <div className="text-center mt-8 lg:mt-12">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 lg:p-6 inline-block">
+              <div className="flex flex-col sm:flex-row items-center gap-3 text-primary">
                 <Brain className="h-5 w-5" />
                 <span className="font-medium">Sistema Gamificado:</span>
-                <span className="text-gray-700">Ganhe pontos, suba de nível e acompanhe seu progresso em tempo real</span>
+                <span className="text-gray-700 text-sm lg:text-base">Ganhe pontos, suba de nível e acompanhe seu progresso em tempo real</span>
               </div>
             </div>
           </div>

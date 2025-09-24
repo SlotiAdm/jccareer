@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { createHash } from "https://deno.land/std@0.168.0/hash/mod.ts";
+import { createHmac } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,206 +14,157 @@ serve(async (req) => {
   }
 
   try {
-    // Verificar se é um webhook da Hotmart
-    const hottok = req.headers.get('x-hottok');
     const hotmartSecret = Deno.env.get('HOTMART_WEBHOOK_SECRET');
-    
-    if (!hottok || !hotmartSecret) {
-      console.error('Missing Hottok or webhook secret');
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Ler o body do webhook
-    const body = await req.text();
-    const webhookData = JSON.parse(body);
-
-    // Verificar assinatura do webhook
-    const expectedSignature = createHash('sha256')
-      .update(body + hotmartSecret)
-      .toString();
     
-    if (hottok !== expectedSignature) {
-      // Log de tentativa de acesso não autorizada
-      await supabase.rpc('log_security_event', {
-        event_type_param: 'webhook_unauthorized',
-        event_data_param: { hottok, ip: req.headers.get('cf-connecting-ip') }
-      });
-      
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!hotmartSecret) {
+      throw new Error('HOTMART_WEBHOOK_SECRET não configurado');
     }
 
-    console.log('Valid Hotmart webhook received:', webhookData.event);
-
-    // Processar diferentes tipos de eventos
-    if (webhookData.event === 'PURCHASE_COMPLETE') {
-      await handlePurchaseComplete(supabase, webhookData);
-    } else if (webhookData.event === 'PURCHASE_REFUNDED') {
-      await handlePurchaseRefunded(supabase, webhookData);
-    } else if (webhookData.event === 'SUBSCRIPTION_CANCELLATION') {
-      await handleSubscriptionCancellation(supabase, webhookData);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Verificar assinatura do webhook
+    const hottok = req.headers.get('x-hottok');
+    const body = await req.text();
+    
+    if (!hottok) {
+      console.log('Webhook rejeitado: sem x-hottok header');
+      return new Response('Unauthorized', { status: 401 });
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Validar assinatura HMAC
+    const expectedSignature = await createHmac("sha256", new TextEncoder().encode(hotmartSecret))
+      .update(new TextEncoder().encode(body))
+      .digest();
+    
+    const expectedHex = Array.from(new Uint8Array(expectedSignature))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    if (hottok !== expectedHex) {
+      console.log('Webhook rejeitado: assinatura inválida');
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    const webhookData = JSON.parse(body);
+    console.log('Webhook válido recebido:', webhookData.event);
+
+    // Log de segurança
+    await supabase.rpc('log_security_event', {
+      event_type_param: 'hotmart_webhook_received',
+      event_data_param: { event: webhookData.event, transaction_id: webhookData.data?.transaction },
+      user_id_param: null
     });
+
+    // Processar diferentes tipos de evento
+    switch (webhookData.event) {
+      case 'PURCHASE_COMPLETE':
+      case 'PURCHASE_APPROVED':
+        await handlePurchaseComplete(supabase, webhookData);
+        break;
+      
+      case 'PURCHASE_REFUNDED':
+      case 'PURCHASE_CANCELED':
+        await handlePurchaseCanceled(supabase, webhookData);
+        break;
+      
+      default:
+        console.log('Evento não processado:', webhookData.event);
+    }
+
+    return new Response(
+      JSON.stringify({ status: 'success', event: webhookData.event }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error('Error in hotmart-webhook function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Erro no webhook Hotmart:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
 });
 
 async function handlePurchaseComplete(supabase: any, webhookData: any) {
-  const buyer = webhookData.data.buyer;
-  const purchase = webhookData.data.purchase;
+  const { buyer, transaction, product } = webhookData.data;
   
   try {
-    // Buscar ou criar usuário por email
-    const { data: existingUser, error: userError } = await supabase.auth.admin.getUserByEmail(buyer.email);
-    
-    let userId;
-    if (existingUser?.user) {
-      userId = existingUser.user.id;
-    } else {
-      // Criar usuário se não existir
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+    // Procurar usuário pelo email
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('cpf_cnpj', buyer.email) // Temporário até termos CPF
+      .single();
+
+    let userId = null;
+
+    if (profileError) {
+      // Criar novo usuário se não existir
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: buyer.email,
         email_confirm: true,
         user_metadata: {
-          full_name: buyer.name,
-          hotmart_purchase: true
+          full_name: buyer.name
         }
       });
-      
-      if (createError) throw createError;
-      userId = newUser.user.id;
+
+      if (authError) throw authError;
+      userId = authData.user.id;
+    } else {
+      userId = profileData.user_id;
     }
 
     // Atualizar perfil com dados da compra
-    const { error: profileError } = await supabase
+    const subscriptionEndDate = new Date();
+    subscriptionEndDate.setFullYear(subscriptionEndDate.getFullYear() + 1); // 1 ano de acesso
+
+    const { error: updateError } = await supabase
       .from('profiles')
-      .upsert({
-        user_id: userId,
-        full_name: buyer.name,
-        cpf_cnpj: buyer.doc,
+      .update({
         subscription_status: 'active',
-        subscription_plan: purchase.product.name,
-        subscription_start_date: new Date(purchase.approved_date * 1000).toISOString(),
-        subscription_end_date: purchase.subscription?.end_date ? 
-          new Date(purchase.subscription.end_date * 1000).toISOString() : null,
-        hotmart_transaction_id: purchase.transaction,
+        subscription_plan: product.name,
+        subscription_start_date: new Date().toISOString(),
+        subscription_end_date: subscriptionEndDate.toISOString(),
+        hotmart_transaction_id: transaction,
         hotmart_webhook_data: webhookData,
         last_hotmart_update: new Date().toISOString()
-      });
+      })
+      .eq('user_id', userId);
 
-    if (profileError) throw profileError;
+    if (updateError) throw updateError;
 
-    // Log da ativação
-    await supabase.rpc('log_security_event', {
-      event_type_param: 'subscription_activated',
-      event_data_param: { 
-        user_id: userId, 
-        transaction_id: purchase.transaction,
-        product: purchase.product.name 
-      },
-      user_id_param: userId
-    });
+    console.log('Usuário ativado com sucesso:', buyer.email);
 
-    console.log(`Subscription activated for user ${userId}`);
-    
   } catch (error) {
-    console.error('Error handling purchase complete:', error);
+    console.error('Erro ao processar compra:', error);
     throw error;
   }
 }
 
-async function handlePurchaseRefunded(supabase: any, webhookData: any) {
-  const purchase = webhookData.data.purchase;
+async function handlePurchaseCanceled(supabase: any, webhookData: any) {
+  const { transaction } = webhookData.data;
   
-  // Encontrar usuário pela transação
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('user_id')
-    .eq('hotmart_transaction_id', purchase.transaction)
-    .single();
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        subscription_status: 'canceled',
+        subscription_end_date: new Date().toISOString(),
+        last_hotmart_update: new Date().toISOString()
+      })
+      .eq('hotmart_transaction_id', transaction);
 
-  if (error || !profile) {
-    console.error('Profile not found for refunded transaction:', purchase.transaction);
-    return;
+    if (error) throw error;
+
+    console.log('Assinatura cancelada:', transaction);
+
+  } catch (error) {
+    console.error('Erro ao cancelar assinatura:', error);
+    throw error;
   }
-
-  // Desativar assinatura
-  await supabase
-    .from('profiles')
-    .update({
-      subscription_status: 'cancelled',
-      subscription_end_date: new Date().toISOString(),
-      hotmart_webhook_data: webhookData,
-      last_hotmart_update: new Date().toISOString()
-    })
-    .eq('user_id', profile.user_id);
-
-  // Log do cancelamento
-  await supabase.rpc('log_security_event', {
-    event_type_param: 'subscription_refunded',
-    event_data_param: { 
-      user_id: profile.user_id, 
-      transaction_id: purchase.transaction 
-    },
-    user_id_param: profile.user_id
-  });
-
-  console.log(`Subscription refunded for user ${profile.user_id}`);
-}
-
-async function handleSubscriptionCancellation(supabase: any, webhookData: any) {
-  const subscription = webhookData.data.subscription;
-  
-  // Encontrar usuário pela transação
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('user_id')
-    .eq('hotmart_transaction_id', subscription.transaction)
-    .single();
-
-  if (error || !profile) {
-    console.error('Profile not found for cancelled subscription:', subscription.transaction);
-    return;
-  }
-
-  // Cancelar assinatura
-  await supabase
-    .from('profiles')
-    .update({
-      subscription_status: 'cancelled',
-      subscription_end_date: new Date(subscription.date_next_charge * 1000).toISOString(),
-      hotmart_webhook_data: webhookData,
-      last_hotmart_update: new Date().toISOString()
-    })
-    .eq('user_id', profile.user_id);
-
-  // Log do cancelamento
-  await supabase.rpc('log_security_event', {
-    event_type_param: 'subscription_cancelled',
-    event_data_param: { 
-      user_id: profile.user_id, 
-      transaction_id: subscription.transaction 
-    },
-    user_id_param: profile.user_id
-  });
-
-  console.log(`Subscription cancelled for user ${profile.user_id}`);
 }
