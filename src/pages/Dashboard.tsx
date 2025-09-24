@@ -155,7 +155,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Training Modules */}
             <div className="lg:col-span-2">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Módulos de Treinamento</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Ferramentas de Desenvolvimento</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {modules.map((module) => {
                   const IconComponent = getIcon(module.icon);
@@ -191,10 +191,6 @@ export default function Dashboard() {
                             <p className="text-sm text-gray-600 mb-4 line-clamp-2">{module.description}</p>
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-4 text-xs text-gray-500">
-                                {/* Hide time metric for Communication Lab */}
-                                {module.name !== 'communication_lab' && (
-                                  <span>⏱️ {module.estimated_time_minutes}min</span>
-                                )}
                                 <span>💎 {module.points_reward}pts</span>
                               </div>
                             </div>
@@ -203,7 +199,7 @@ export default function Dashboard() {
                               disabled={isLocked}
                               onClick={() => {
                                 if (isLocked) return;
-                                // Rotas dedicadas para módulos especiais
+                                // Rotas dedicadas para ferramentas
                                 if (module.name === 'interview_dojo') {
                                   navigate('/interview-dojo');
                                 } else if (module.name === 'spreadsheet_arena') {
@@ -218,7 +214,7 @@ export default function Dashboard() {
                                   navigate('/bsc-strategic');
                                 } else if (module.name === 'career_gps') {
                                   navigate('/training/career_gps');
-                                } else if (module.name === 'curriculum_analysis') {
+                                } else if (module.name === 'curriculum_analysis' || module.name === 'resume_analyzer') {
                                   navigate('/resume-analyzer');
                                 } else {
                                   navigate(`/training/${module.name}`);

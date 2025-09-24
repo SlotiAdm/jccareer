@@ -1,6 +1,11 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 // Input sanitization functions
 function sanitizeUserInput(input: string): { sanitized: string; warnings: string[] } {
@@ -45,10 +50,10 @@ function sanitizeStructuredInput(data: any): any {
   return data;
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+interface BSCRequest {
+  company_info: any;
+  strategic_objectives: any;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -56,177 +61,217 @@ serve(async (req) => {
   }
 
   try {
-    const { company_info, strategic_objectives, user_id } = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
+    if (!supabaseUrl || !supabaseKey || !openAIApiKey) {
+      console.error('Missing environment variables');
+      return new Response(JSON.stringify({ 
+        error: 'Configuração do servidor incompleta' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Rate limiting check
+    const { data: rateLimitData, error: rateLimitError } = await supabase
+      .rpc('check_rate_limit', {
+        p_user_id: user.id,
+        p_module_name: 'bsc_strategic',
+        p_limit_per_hour: 5
+      });
+
+    if (rateLimitError || !rateLimitData) {
+      console.error('Rate limit check failed:', rateLimitError);
+      return new Response(JSON.stringify({ 
+        error: 'Limite de uso excedido. Tente novamente em uma hora.' 
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const requestData: BSCRequest = await req.json();
     
-    if (!company_info || !strategic_objectives) {
-      throw new Error('Informações da empresa e objetivos estratégicos são obrigatórios');
+    if (!requestData.company_info || !requestData.strategic_objectives) {
+      return new Response(JSON.stringify({ 
+        error: 'Informações da empresa e objetivos estratégicos são obrigatórios' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Sanitize inputs
-    const sanitizedCompanyInfo = sanitizeStructuredInput(company_info);
-    const sanitizedObjectives = sanitizeStructuredInput(strategic_objectives);
-
-    // Rate limiting check
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    if (user_id) {
-      const { data: rateLimitCheck } = await supabase.rpc('check_rate_limit', {
-        p_user_id: user_id,
-        p_module_name: 'bsc_strategic',
-        p_limit_per_hour: 20
-      });
-
-      if (!rateLimitCheck) {
-        throw new Error('Rate limit exceeded. Please try again later.');
-      }
-    }
-
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
+    const sanitizedCompanyInfo = sanitizeStructuredInput(requestData.company_info);
+    const sanitizedObjectives = sanitizeStructuredInput(requestData.strategic_objectives);
 
     console.log('BSC Strategic creation for company:', sanitizedCompanyInfo.name);
 
     const prompt = `
-    Você é um consultor estratégico especializado em Balanced Scorecard (BSC). Ajude a criar um BSC completo e bem estruturado.
+Você é um consultor estratégico especializado em Balanced Scorecard (BSC). Ajude a criar um BSC completo e bem estruturado em português brasileiro.
 
-    INFORMAÇÕES DA EMPRESA:
-    ${JSON.stringify(sanitizedCompanyInfo, null, 2)}
+INFORMAÇÕES DA EMPRESA:
+${JSON.stringify(sanitizedCompanyInfo, null, 2)}
 
-    OBJETIVOS ESTRATÉGICOS INICIAIS:
-    ${JSON.stringify(sanitizedObjectives, null, 2)}
+OBJETIVOS ESTRATÉGICOS INICIAIS:
+${JSON.stringify(sanitizedObjectives, null, 2)}
 
-    Forneça um Balanced Scorecard completo seguindo EXATAMENTE este formato JSON:
+Forneça um Balanced Scorecard completo seguindo EXATAMENTE este formato JSON:
 
-    {
-      "bsc_overview": {
-        "company_name": "${sanitizedCompanyInfo.name || 'Empresa'}",
-        "industry": "setor identificado",
-        "strategic_focus": "foco estratégico principal",
-        "time_horizon": "horizonte temporal recomendado"
-      },
-      "financial_perspective": {
-        "title": "Perspectiva Financeira",
-        "description": "Objetivos relacionados ao desempenho financeiro",
-        "objectives": [
+{
+  "bsc_overview": {
+    "company_name": "${sanitizedCompanyInfo.name || 'Empresa'}",
+    "industry": "setor identificado",
+    "strategic_focus": "foco estratégico principal",
+    "time_horizon": "horizonte temporal recomendado"
+  },
+  "financial_perspective": {
+    "title": "Perspectiva Financeira",
+    "description": "Objetivos relacionados ao desempenho financeiro",
+    "objectives": [
+      {
+        "objective": "objetivo financeiro 1",
+        "description": "descrição detalhada",
+        "kpis": [
           {
-            "objective": "objetivo financeiro 1",
-            "description": "descrição detalhada",
-            "kpis": [
-              {
-                "name": "nome do KPI",
-                "measurement": "como medir",
-                "target": "meta sugerida",
-                "frequency": "frequência de medição"
-              }
-            ],
-            "initiatives": ["iniciativa 1", "iniciativa 2"]
-          }
-        ]
-      },
-      "customer_perspective": {
-        "title": "Perspectiva do Cliente",
-        "description": "Objetivos relacionados à satisfação e valor para clientes",
-        "objectives": [
-          {
-            "objective": "objetivo do cliente 1",
-            "description": "descrição detalhada",
-            "kpis": [
-              {
-                "name": "nome do KPI",
-                "measurement": "como medir",
-                "target": "meta sugerida",
-                "frequency": "frequência de medição"
-              }
-            ],
-            "initiatives": ["iniciativa 1", "iniciativa 2"]
-          }
-        ]
-      },
-      "internal_processes_perspective": {
-        "title": "Perspectiva dos Processos Internos",
-        "description": "Objetivos relacionados à eficiência operacional",
-        "objectives": [
-          {
-            "objective": "objetivo de processo 1",
-            "description": "descrição detalhada",
-            "kpis": [
-              {
-                "name": "nome do KPI",
-                "measurement": "como medir",
-                "target": "meta sugerida",
-                "frequency": "frequência de medição"
-              }
-            ],
-            "initiatives": ["iniciativa 1", "iniciativa 2"]
-          }
-        ]
-      },
-      "learning_growth_perspective": {
-        "title": "Perspectiva de Aprendizado e Crescimento",
-        "description": "Objetivos relacionados ao capital humano e organizacional",
-        "objectives": [
-          {
-            "objective": "objetivo de aprendizado 1",
-            "description": "descrição detalhada",
-            "kpis": [
-              {
-                "name": "nome do KPI",
-                "measurement": "como medir",
-                "target": "meta sugerida",
-                "frequency": "frequência de medição"
-              }
-            ],
-            "initiatives": ["iniciativa 1", "iniciativa 2"]
-          }
-        ]
-      },
-      "strategic_alignment": {
-        "cause_effect_relationships": [
-          {
-            "from_perspective": "perspectiva origem",
-            "to_perspective": "perspectiva destino",
-            "relationship": "descrição da relação causal"
+            "name": "nome do KPI",
+            "measurement": "como medir",
+            "target": "meta sugerida",
+            "frequency": "frequência de medição"
           }
         ],
-        "alignment_score": (0-100),
-        "alignment_notes": "notas sobre o alinhamento estratégico"
-      },
-      "implementation_roadmap": {
-        "phase_1": {
-          "duration": "prazo",
-          "focus": "foco principal",
-          "key_actions": ["ação 1", "ação 2"]
-        },
-        "phase_2": {
-          "duration": "prazo", 
-          "focus": "foco principal",
-          "key_actions": ["ação 1", "ação 2"]
-        },
-        "phase_3": {
-          "duration": "prazo",
-          "focus": "foco principal", 
-          "key_actions": ["ação 1", "ação 2"]
-        }
-      },
-      "success_factors": [
-        "fator crítico 1",
-        "fator crítico 2",
-        "fator crítico 3"
-      ],
-      "recommendations": [
-        "recomendação 1",
-        "recomendação 2",
-        "recomendação 3"
-      ]
+        "initiatives": ["iniciativa 1", "iniciativa 2"]
+      }
+    ]
+  },
+  "customer_perspective": {
+    "title": "Perspectiva do Cliente",
+    "description": "Objetivos relacionados à satisfação e valor para clientes",
+    "objectives": [
+      {
+        "objective": "objetivo do cliente 1",
+        "description": "descrição detalhada",
+        "kpis": [
+          {
+            "name": "nome do KPI",
+            "measurement": "como medir",
+            "target": "meta sugerida",
+            "frequency": "frequência de medição"
+          }
+        ],
+        "initiatives": ["iniciativa 1", "iniciativa 2"]
+      }
+    ]
+  },
+  "internal_processes_perspective": {
+    "title": "Perspectiva dos Processos Internos",
+    "description": "Objetivos relacionados à eficiência operacional",
+    "objectives": [
+      {
+        "objective": "objetivo de processo 1",
+        "description": "descrição detalhada",
+        "kpis": [
+          {
+            "name": "nome do KPI",
+            "measurement": "como medir",
+            "target": "meta sugerida",
+            "frequency": "frequência de medição"
+          }
+        ],
+        "initiatives": ["iniciativa 1", "iniciativa 2"]
+      }
+    ]
+  },
+  "learning_growth_perspective": {
+    "title": "Perspectiva de Aprendizado e Crescimento",
+    "description": "Objetivos relacionados ao capital humano e organizacional",
+    "objectives": [
+      {
+        "objective": "objetivo de aprendizado 1",
+        "description": "descrição detalhada",
+        "kpis": [
+          {
+            "name": "nome do KPI",
+            "measurement": "como medir",
+            "target": "meta sugerida",
+            "frequency": "frequência de medição"
+          }
+        ],
+        "initiatives": ["iniciativa 1", "iniciativa 2"]
+      }
+    ]
+  },
+  "strategic_alignment": {
+    "cause_effect_relationships": [
+      {
+        "from_perspective": "perspectiva origem",
+        "to_perspective": "perspectiva destino",
+        "relationship": "descrição da relação causal"
+      }
+    ],
+    "alignment_score": (0-100),
+    "alignment_notes": "notas sobre o alinhamento estratégico"
+  },
+  "implementation_roadmap": {
+    "phase_1": {
+      "duration": "prazo",
+      "focus": "foco principal",
+      "key_actions": ["ação 1", "ação 2"]
+    },
+    "phase_2": {
+      "duration": "prazo", 
+      "focus": "foco principal",
+      "key_actions": ["ação 1", "ação 2"]
+    },
+    "phase_3": {
+      "duration": "prazo",
+      "focus": "foco principal", 
+      "key_actions": ["ação 1", "ação 2"]
     }
+  },
+  "success_factors": [
+    "fator crítico 1",
+    "fator crítico 2",
+    "fator crítico 3"
+  ],
+  "recommendations": [
+    "recomendação 1",
+    "recomendação 2",
+    "recomendação 3"
+  ]
+}
 
-    Garanta que o BSC seja coerente, com objetivos interconectados entre as perspectivas e KPIs mensuráveis.
-    `;
+Garanta que o BSC seja coerente, com objetivos interconectados entre as perspectivas e KPIs mensuráveis.
+`;
 
+    console.log('Calling OpenAI API for BSC generation...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -238,17 +283,43 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are a strategic management consultant with deep expertise in Balanced Scorecard methodology. Always respond with valid JSON following the exact structure requested.' 
+            content: 'Você é um consultor estratégico com profunda expertise em metodologia Balanced Scorecard. Sempre responda com JSON válido seguindo exatamente a estrutura solicitada em português brasileiro.' 
           },
           { role: 'user', content: prompt }
         ],
-        max_tokens: 2200,
+        max_tokens: 3000,
         temperature: 0.7,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+      const errorData = await response.text();
+      console.error('OpenAI API error:', response.status, errorData);
+      
+      if (response.status === 401) {
+        return new Response(JSON.stringify({ 
+          error: 'Erro de autenticação da API. Entre em contato com o suporte.' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ 
+          error: 'Muitas requisições. Tente novamente em alguns minutos.' 
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ 
+        error: 'Serviço temporariamente indisponível. Tente novamente.' 
+      }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const data = await response.json();
@@ -264,11 +335,16 @@ serve(async (req) => {
       analysis = JSON.parse(analysisText);
     } catch (e) {
       console.error('Failed to parse JSON:', analysisText);
-      throw new Error('Erro ao processar resposta da IA');
+      return new Response(JSON.stringify({ 
+        error: 'Erro ao processar resposta da IA. Tente novamente.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Save simulation session
-    if (user_id) {
+    try {
       const { data: moduleData } = await supabase
         .from('training_modules')
         .select('id')
@@ -279,7 +355,7 @@ serve(async (req) => {
         await supabase
           .from('simulation_sessions')
           .insert({
-            user_id,
+            user_id: user.id,
             module_id: moduleData.id,
             session_type: 'bsc_creation',
             input_data: { company_info: sanitizedCompanyInfo, strategic_objectives: sanitizedObjectives },
@@ -288,7 +364,20 @@ serve(async (req) => {
             completed: true
           });
       }
+    } catch (saveError) {
+      console.error('Error saving session:', saveError);
+      // Continue without throwing error
     }
+
+    // Log API usage
+    await supabase.rpc('log_api_usage', {
+      p_user_id: user.id,
+      p_module_name: 'bsc_strategic',
+      p_function_name: 'generate_bsc',
+      p_input_tokens: data.usage?.prompt_tokens || 0,
+      p_output_tokens: data.usage?.completion_tokens || 0,
+      p_cost_estimate: ((data.usage?.prompt_tokens || 0) * 0.00015 + (data.usage?.completion_tokens || 0) * 0.0002) / 1000
+    });
 
     console.log('BSC Strategic completed successfully');
 
@@ -298,7 +387,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in bsc-strategic function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: 'Erro interno do servidor. Tente novamente.' 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
