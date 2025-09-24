@@ -194,7 +194,7 @@ export default function Checkout() {
                 <div className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium">Acesso ao Terminal</p>
+                    <p className="font-medium">Acesso ao BussulaC</p>
                     <p className="text-sm text-gray-600">Análises diárias de inteligência estratégica</p>
                   </div>
                 </div>

@@ -22,7 +22,7 @@ export const Sidebar = () => {
     <>
       <div className="flex h-16 shrink-0 items-center px-6 border-b border-gray-200">
         <Link to="/dashboard" className="text-xl font-bold text-gray-900">
-          O Terminal
+          BussulaC
         </Link>
         {isMobile && (
           <Button

@@ -14,6 +14,8 @@ import ModuleTraining from "./pages/ModuleTraining";
 import InterviewDojo from "./pages/InterviewDojo";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import SpreadsheetArenaPage from "./pages/SpreadsheetArenaPage";
+import ErpSimulator from "./pages/ErpSimulator";
 
 // Configurar QueryClient com otimizações de performance
 const queryClient = new QueryClient({

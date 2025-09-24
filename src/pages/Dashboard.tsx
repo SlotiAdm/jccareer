@@ -139,7 +139,7 @@ export default function Dashboard() {
                   Bem-vindo de volta, {profile?.full_name}!
                 </h1>
                 <p className="text-gray-600">
-                  Continue seu treinamento estratégico no Terminal
+                  Continue seu treinamento estratégico no BussulaC
                 </p>
               </div>
               {getStatusBadge()}

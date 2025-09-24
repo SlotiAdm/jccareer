@@ -20,7 +20,7 @@ export default function Confirmation() {
           </h1>
           
           <p className="text-xl text-gray-600">
-            Seu acesso ao Terminal está liberado
+            Seu acesso ao BussulaC está liberado
           </p>
         </div>
 
@@ -98,7 +98,7 @@ export default function Confirmation() {
               </h4>
               <p className="text-blue-800 text-sm">
                 Você receberá um email de boas-vindas com informações importantes 
-                sobre como aproveitar ao máximo sua assinatura do Terminal.
+                sobre como aproveitar ao máximo sua assinatura do BussulaC.
               </p>
             </div>
           </CardContent>

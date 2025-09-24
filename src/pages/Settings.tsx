@@ -146,7 +146,7 @@ export default function Settings() {
                 Status da Assinatura
               </CardTitle>
               <CardDescription>
-                Informações sobre sua assinatura do Terminal
+                Informações sobre sua assinatura do BussulaC
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -73,7 +73,7 @@ const LandingPage = () => {
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-foreground">Terminal</span>
+          <span className="text-xl font-bold text-foreground">BussulaC</span>
         </div>
         
         <div className="flex items-center gap-4">
@@ -99,7 +99,7 @@ const LandingPage = () => {
           </div>
           
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-            O <span className="text-primary">Terminal</span> dos
+            O <span className="text-primary">BussulaC</span> dos
             <br />
             Analistas de Elite
           </h1>
@@ -219,7 +219,7 @@ const LandingPage = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Como o Terminal Acelera sua Carreira
+              Como o BussulaC Acelera sua Carreira
             </h2>
             <p className="text-xl text-gray-600">
               Metodologia comprovada em 3 etapas simples
@@ -422,7 +422,7 @@ const LandingPage = () => {
       <footer className="bg-gray-800 text-white py-12 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <div className="mb-8">
-            <h3 className="text-2xl font-bold mb-2">O Terminal</h3>
+            <h3 className="text-2xl font-bold mb-2">BussulaC</h3>
             <p className="text-gray-400">Uma iniciativa SLOTI</p>
           </div>
           

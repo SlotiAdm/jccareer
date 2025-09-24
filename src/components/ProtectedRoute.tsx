@@ -53,7 +53,7 @@ export const ProtectedRoute = ({
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-terminal-light to-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-terminal-text">Carregando O Terminal...</p>
+          <p className="text-terminal-text">Carregando o BussulaC...</p>
         </div>
       </div>
     );
@@ -75,7 +75,7 @@ export const ProtectedRoute = ({
             <CardTitle>Acesso Limitado</CardTitle>
             <CardDescription>
               {accessStatus === 'expired' 
-                ? 'Seu período de teste expirou. Assine para continuar usando o Terminal.'
+                ? 'Seu período de teste expirou. Assine para continuar usando o BussulaC.'
                 : 'Você já usou suas sessões gratuitas. Assine para acesso ilimitado.'
               }
             </CardDescription>

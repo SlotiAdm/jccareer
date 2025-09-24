@@ -57,7 +57,7 @@ export default function Auth() {
         </Link>
         
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">O Terminal</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">BussulaC</h1>
           <p className="text-gray-600">Acesse sua conta ou crie uma nova</p>
         </div>
 

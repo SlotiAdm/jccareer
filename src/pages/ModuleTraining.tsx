@@ -97,9 +97,7 @@ export default function ModuleTraining() {
       try {
         setLoading(true);
         
-        // Verificar acesso primeiro
-        const hasAccess = trialAccess.canAccessModule();
-        setCanAccess(hasAccess);
+        // Verificar acesso será definido após carregar o status de trial
         
         // Buscar módulo no banco
         const { data: moduleData, error } = await supabase
@@ -107,7 +105,7 @@ export default function ModuleTraining() {
           .select('*')
           .eq('name', moduleName)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Error fetching module:', error);
@@ -140,7 +138,14 @@ export default function ModuleTraining() {
     };
 
     fetchModule();
-  }, [moduleName, navigate, trialAccess, toast]);
+  }, [moduleName]);
+
+  // Atualizar permissão de acesso quando status de trial carregar
+  useEffect(() => {
+    if (trialAccess.status !== 'loading') {
+      setCanAccess(trialAccess.canAccessModule());
+    }
+  }, [trialAccess.status]);
 
   const startSimulation = async (data: any) => {
     if (!module || !user || !canAccess) {
@@ -157,7 +162,7 @@ export default function ModuleTraining() {
     if (!canUseSession) {
       toast({
         title: "Limite atingido",
-        description: "Faça upgrade para continuar usando o Terminal.",
+        description: "Faça upgrade para continuar usando o BussulaC.",
         variant: "destructive"
       });
       navigate('/checkout');
