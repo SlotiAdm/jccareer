@@ -60,7 +60,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
           messages: [
             { role: 'system', content: 'You are a professional interviewer. Always respond with valid JSON.' },
             { role: 'user', content: prompt }
