@@ -117,7 +117,19 @@ serve(async (req) => {
       });
     }
 
-    const requestData: BSCRequest = await req.json();
+    let requestData: BSCRequest;
+    try {
+      requestData = await req.json();
+      console.log('BSC Strategic analysis request for user:', user.id, 'Request size:', JSON.stringify(requestData).length);
+    } catch (parseError) {
+      console.error('Erro ao parsear JSON da requisição:', parseError);
+      return new Response(JSON.stringify({ 
+        error: 'Dados da requisição inválidos. Verifique o formato.' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     if (!requestData.company_info || !requestData.strategic_objectives) {
       return new Response(JSON.stringify({ 
@@ -386,9 +398,16 @@ Garanta que o BSC seja coerente, com objetivos interconectados entre as perspect
     });
 
   } catch (error) {
-    console.error('Error in bsc-strategic function:', error);
+    console.error('ERRO DETALHADO NA EDGE FUNCTION bsc-strategic:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      timestamp: new Date().toISOString()
+    });
+    
     return new Response(JSON.stringify({ 
-      error: 'Erro interno do servidor. Tente novamente.' 
+      error: 'Erro interno do servidor. Tente novamente.',
+      details: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

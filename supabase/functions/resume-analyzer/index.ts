@@ -75,8 +75,19 @@ serve(async (req) => {
       });
     }
 
-    const requestData: ResumeAnalysisRequest = await req.json();
-    console.log('Resume analysis request for user:', user.id);
+    let requestData: ResumeAnalysisRequest;
+    try {
+      requestData = await req.json();
+      console.log('Resume analysis request for user:', user.id, 'Request size:', JSON.stringify(requestData).length);
+    } catch (parseError) {
+      console.error('Erro ao parsear JSON da requisição:', parseError);
+      return new Response(JSON.stringify({ 
+        error: 'Dados da requisição inválidos. Verifique o formato.' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Input validation
     if (!requestData.originalResume || requestData.originalResume.trim().length < 50) {
@@ -147,6 +158,8 @@ Retorne APENAS um JSON válido no seguinte formato:
         temperature: 0.7,
       }),
     });
+
+    console.log('OpenAI Response status:', response.status, 'OK:', response.ok);
 
     if (!response.ok) {
       const errorData = await response.text();
@@ -250,9 +263,16 @@ Retorne APENAS um JSON válido no seguinte formato:
     });
 
   } catch (error) {
-    console.error('Error in resume-analyzer function:', error);
+    console.error('ERRO DETALHADO NA EDGE FUNCTION resume-analyzer:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      timestamp: new Date().toISOString()
+    });
+    
     return new Response(JSON.stringify({ 
-      error: 'Erro interno do servidor. Tente novamente.' 
+      error: 'Erro interno do servidor. Tente novamente.',
+      details: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

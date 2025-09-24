@@ -78,8 +78,19 @@ serve(async (req) => {
       });
     }
 
-    const requestData: InterviewRequest = await req.json();
-    console.log('Interview dojo action:', requestData.action, 'Type:', requestData.interview_type);
+    let requestData: InterviewRequest;
+    try {
+      requestData = await req.json();
+      console.log('Interview dojo action:', requestData.action, 'Type:', requestData.interview_type, 'Request size:', JSON.stringify(requestData).length);
+    } catch (parseError) {
+      console.error('Erro ao parsear JSON da requisição:', parseError);
+      return new Response(JSON.stringify({ 
+        error: 'Dados da requisição inválidos. Verifique o formato.' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Input validation
     if (!requestData.action || !['start_interview', 'continue_interview'].includes(requestData.action)) {
@@ -103,9 +114,16 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in interview-dojo function:', error);
+    console.error('ERRO DETALHADO NA EDGE FUNCTION interview-dojo:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      timestamp: new Date().toISOString()
+    });
+    
     return new Response(JSON.stringify({ 
-      error: 'Erro interno do servidor. Tente novamente.' 
+      error: 'Erro interno do servidor. Tente novamente.',
+      details: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
