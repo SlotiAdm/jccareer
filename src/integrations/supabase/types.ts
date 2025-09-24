@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_cost_logs: {
+        Row: {
+          completion_tokens: number
+          created_at: string
+          estimated_cost: number | null
+          id: string
+          model_used: string | null
+          module_name: string
+          prompt_tokens: number
+          total_tokens: number
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          model_used?: string | null
+          module_name: string
+          prompt_tokens?: number
+          total_tokens?: number
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          model_used?: string | null
+          module_name?: string
+          prompt_tokens?: number
+          total_tokens?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_cost_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       career_profiles: {
         Row: {
           achievements: Json | null
@@ -242,6 +286,7 @@ export type Database = {
           subscription_plan: string | null
           subscription_start_date: string | null
           subscription_status: string | null
+          token_balance: number | null
           total_points: number | null
           trial_end_date: string | null
           trial_start_date: string | null
@@ -265,6 +310,7 @@ export type Database = {
           subscription_plan?: string | null
           subscription_start_date?: string | null
           subscription_status?: string | null
+          token_balance?: number | null
           total_points?: number | null
           trial_end_date?: string | null
           trial_start_date?: string | null
@@ -288,6 +334,7 @@ export type Database = {
           subscription_plan?: string | null
           subscription_start_date?: string | null
           subscription_status?: string | null
+          token_balance?: number | null
           total_points?: number | null
           trial_end_date?: string | null
           trial_start_date?: string | null
@@ -619,6 +666,10 @@ export type Database = {
         Args: { p_module_name: string; p_user_id: string }
         Returns: Json
       }
+      check_and_deduct_tokens: {
+        Args: { p_token_cost: number; p_user_id: string }
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: {
           p_limit_per_hour?: number
@@ -638,6 +689,16 @@ export type Database = {
       increment_free_session: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      log_api_cost: {
+        Args: {
+          p_completion_tokens: number
+          p_model_used?: string
+          p_module_name: string
+          p_prompt_tokens: number
+          p_user_id: string
+        }
+        Returns: undefined
       }
       log_api_usage: {
         Args: {
