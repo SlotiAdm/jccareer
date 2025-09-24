@@ -91,7 +91,10 @@ export default function SpreadsheetArena({ onComplete }: SpreadsheetArenaProps) 
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro ao processar sua solução';
+        throw new Error(message);
+      }
 
       setResults(data.analysis);
       setActiveTab('results');
@@ -107,11 +110,11 @@ export default function SpreadsheetArena({ onComplete }: SpreadsheetArenaProps) 
         onComplete?.(score);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting solution:', error);
       toast({
         title: "Erro",
-        description: "Erro ao processar sua solução. Tente novamente.",
+        description: error?.message || "Alta demanda no momento. Tente novamente.",
         variant: "destructive",
       });
     } finally {

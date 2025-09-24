@@ -188,7 +188,7 @@ export default function ModuleTraining() {
 
       if (error) {
         console.error('Function error:', error);
-        throw new Error(error.message || 'Erro na simulação');
+        throw new Error((responseData as any)?.error || error.message || 'Erro na simulação');
       }
 
       if (!responseData) {

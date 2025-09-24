@@ -73,18 +73,21 @@ export default function ResumeAnalyzer() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro ao gerar currículo';
+        throw new Error(message);
+      }
 
       setResult(data);
       toast({
         title: "Análise concluída!",
         description: "Seu currículo estratégico foi gerado com sucesso.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro na análise:', error);
       toast({
         title: "Erro na análise",
-        description: "Não foi possível gerar seu currículo estratégico. Tente novamente.",
+        description: error?.message || "Alta demanda no momento. Tente novamente.",
         variant: "destructive"
       });
     } finally {

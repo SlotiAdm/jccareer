@@ -44,18 +44,21 @@ export default function CommunicationLab() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro na análise';
+        throw new Error(message);
+      }
 
       setAnalysisResult(data);
       toast({
         title: "Análise concluída!",
         description: "Sua situação foi analisada pelo estrategista de comunicação.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro na análise:', error);
       toast({
         title: "Erro na análise",
-        description: "Não foi possível analisar a situação. Tente novamente.",
+        description: error?.message || "Alta demanda no momento. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -84,18 +87,21 @@ export default function CommunicationLab() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro na análise';
+        throw new Error(message);
+      }
 
       setAnalysisResult(data);
       toast({
         title: "Análise concluída!",
         description: "Sua mensagem foi analisada pelo estrategista de comunicação.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro na análise:', error);
       toast({
         title: "Erro na análise",
-        description: "Não foi possível analisar a mensagem. Tente novamente.",
+        description: error?.message || "Alta demanda no momento. Tente novamente.",
         variant: "destructive"
       });
     } finally {

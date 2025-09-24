@@ -64,7 +64,10 @@ export default function InterviewDojo() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro ao iniciar entrevista';
+        throw new Error(message);
+      }
 
       setSessionId(data.session_id);
       setInterviewStarted(true);
@@ -80,13 +83,13 @@ export default function InterviewDojo() {
         title: "Entrevista iniciada!",
         description: "Responda com naturalidade e seja específico.",
       });
-    } catch (error: any) {
-      console.error('Error:', error);
-      toast({
-        title: "Erro ao iniciar entrevista",
-        description: error.message || "Tente novamente",
-        variant: "destructive",
-      });
+      } catch (error: any) {
+        console.error('Error:', error);
+        toast({
+          title: "Erro ao iniciar entrevista",
+          description: error?.message || "Alta demanda no momento. Tente novamente em instantes.",
+          variant: "destructive",
+        });
     } finally {
       setIsProcessing(false);
     }
@@ -116,7 +119,10 @@ export default function InterviewDojo() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro ao enviar resposta';
+        throw new Error(message);
+      }
 
       // Add interviewer response
       setChatMessages(prev => [...prev, {

@@ -40,12 +40,15 @@ export default function ErpSimulator() {
           user_id: user?.id,
         },
       });
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro na simulação';
+        throw new Error(message);
+      }
       setResult(data);
       toast({ title: "Simulação concluída!", description: "Confira a análise abaixo." });
     } catch (err: any) {
       console.error(err);
-      toast({ title: "Erro na simulação", description: err.message || "Tente novamente.", variant: "destructive" });
+      toast({ title: "Erro na simulação", description: err?.message || "Alta demanda no momento. Tente novamente.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

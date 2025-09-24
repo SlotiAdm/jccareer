@@ -95,17 +95,18 @@ serve(async (req) => {
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are an expert ERP consultant and business process analyst. Always respond with valid JSON following the exact structure requested.' 
-          },
-          { role: 'user', content: prompt }
-        ],
-        max_completion_tokens: 2500,
-      }),
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { 
+              role: 'system', 
+              content: 'You are an expert ERP consultant and business process analyst. Always respond with valid JSON following the exact structure requested.' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 1800,
+          temperature: 0.7,
+        }),
     });
 
     if (!response.ok) {

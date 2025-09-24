@@ -59,20 +59,21 @@ Retorne APENAS um JSON válido no seguinte formato:
         'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um especialista em recrutamento e otimização de currículos. Sempre responda apenas com JSON válido.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 2000,
-      }),
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'Você é um especialista em recrutamento e otimização de currículos. Sempre responda apenas com JSON válido.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 1600,
+          temperature: 0.7,
+        }),
     });
 
     if (!response.ok) {

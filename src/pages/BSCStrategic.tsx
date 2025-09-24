@@ -99,7 +99,10 @@ export default function BSCStrategic() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro ao gerar BSC';
+        throw new Error(message);
+      }
 
       setResult(data);
       
