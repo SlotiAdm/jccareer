@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      module_configurations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          module_name: string
+          settings: Json | null
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          module_name: string
+          settings?: Json | null
+          system_prompt: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          module_name?: string
+          settings?: Json | null
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cpf_cnpj: string | null
@@ -22,8 +52,10 @@ export type Database = {
           free_sessions_used: number | null
           full_name: string
           hotmart_transaction_id: string | null
+          hotmart_webhook_data: Json | null
           id: string
           is_admin: boolean | null
+          last_hotmart_update: string | null
           subscription_end_date: string | null
           subscription_plan: string | null
           subscription_start_date: string | null
@@ -40,8 +72,10 @@ export type Database = {
           free_sessions_used?: number | null
           full_name: string
           hotmart_transaction_id?: string | null
+          hotmart_webhook_data?: Json | null
           id?: string
           is_admin?: boolean | null
+          last_hotmart_update?: string | null
           subscription_end_date?: string | null
           subscription_plan?: string | null
           subscription_start_date?: string | null
@@ -58,8 +92,10 @@ export type Database = {
           free_sessions_used?: number | null
           full_name?: string
           hotmart_transaction_id?: string | null
+          hotmart_webhook_data?: Json | null
           id?: string
           is_admin?: boolean | null
+          last_hotmart_update?: string | null
           subscription_end_date?: string | null
           subscription_plan?: string | null
           subscription_start_date?: string | null
@@ -68,6 +104,36 @@ export type Database = {
           trial_start_date?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      security_audit_logs: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -249,9 +315,21 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: string
       }
+      check_trial_status_secure: {
+        Args: { user_id_param: string }
+        Returns: string
+      }
       increment_free_session: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      log_security_event: {
+        Args: {
+          event_data_param?: Json
+          event_type_param: string
+          user_id_param?: string
+        }
+        Returns: undefined
       }
       start_user_trial: {
         Args: { user_id_param: string }
