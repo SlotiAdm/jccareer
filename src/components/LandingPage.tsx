@@ -162,17 +162,9 @@ const LandingPage = () => {
               return (
                 <Card key={index} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white h-full">
                   <CardContent className="p-4 lg:p-6 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-center mb-4">
                       <div className={`w-10 h-10 lg:w-12 lg:h-12 ${module.color} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform`}>
                         <IconComponent className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
-                      </div>
-                      <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`h-3 w-3 ${i < module.difficulty ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                          />
-                        ))}
                       </div>
                     </div>
                     
@@ -189,11 +181,8 @@ const LandingPage = () => {
                     </div>
                     
                     <div className="mt-auto pt-4 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className="text-xs">
-                          IA Personalizada
-                        </Badge>
-                        <span className="text-xs lg:text-sm text-gray-500">Nível {module.difficulty}/5</span>
+                      <div className="text-center">
+                        <span className="text-xs lg:text-sm text-gray-500 font-medium">Simulação com IA</span>
                       </div>
                     </div>
                   </CardContent>
@@ -294,10 +283,12 @@ const LandingPage = () => {
             </div>
           </div>
 
-          <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-4">
-            Garantir Acesso Completo
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
+            <Link to="/checkout">
+              <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-4">
+                Garantir Acesso Completo
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
         </div>
       </section>
 

@@ -7,6 +7,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input sanitization function
+function sanitizeUserInput(input: string): { sanitized: string; warnings: string[] } {
+  const warnings: string[] = [];
+  let sanitized = input;
+
+  // Remove potentially dangerous patterns
+  const dangerousPatterns = [
+    /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+    /javascript:/gi,
+    /vbscript:/gi,
+    /onload\s*=/gi,
+    /onerror\s*=/gi,
+    /onclick\s*=/gi,
+  ];
+
+  dangerousPatterns.forEach(pattern => {
+    if (pattern.test(sanitized)) {
+      warnings.push('Suspicious content detected and removed');
+      sanitized = sanitized.replace(pattern, '');
+    }
+  });
+
+  // Limit length
+  if (sanitized.length > 10000) {
+    warnings.push('Input truncated to 10000 characters');
+    sanitized = sanitized.substring(0, 10000);
+  }
+
+  return { sanitized, warnings };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,6 +50,12 @@ serve(async (req) => {
       throw new Error('Cenário e texto são obrigatórios');
     }
 
+    // Sanitize input
+    const sanitizedInput = sanitizeUserInput(user_text);
+    if (sanitizedInput.warnings.length > 0) {
+      console.warn('Input sanitization warnings:', sanitizedInput.warnings);
+    }
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
@@ -27,6 +64,24 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Rate limiting check for authenticated users
+    if (user_id) {
+      const { data: rateLimitOk } = await supabase.rpc('check_rate_limit', {
+        p_user_id: user_id,
+        p_module_name: 'communication-lab',
+        p_limit_per_hour: 30
+      });
+
+      if (!rateLimitOk) {
+        return new Response(JSON.stringify({
+          error: 'Rate limit exceeded. Please try again later.'
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     console.log('Communication lab analysis for scenario:', scenario);
 
@@ -46,7 +101,7 @@ serve(async (req) => {
     CENÁRIO: ${scenarioDescription}
 
     TEXTO ORIGINAL:
-    ${user_text}
+    ${sanitizedInput.sanitized}
 
     Forneça uma análise completa seguindo EXATAMENTE este formato JSON:
 
@@ -143,11 +198,18 @@ serve(async (req) => {
             user_id,
             module_id: moduleData.id,
             session_type: `communication_${scenario}`,
-            input_data: { scenario, user_text },
+            input_data: { scenario, user_text: sanitizedInput.sanitized },
             ai_response: analysis,
             score: analysis.overall_score,
             completed: true
           });
+
+        // Log API usage
+        await supabase.rpc('log_api_usage', {
+          p_user_id: user_id,
+          p_module_name: 'communication-lab',
+          p_function_name: 'communication_analysis'
+        });
       }
     }
 

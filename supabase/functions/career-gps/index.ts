@@ -7,6 +7,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input sanitization function
+function sanitizeUserInput(input: string): { sanitized: string; warnings: string[] } {
+  const warnings: string[] = [];
+  let sanitized = input;
+
+  // Remove potentially dangerous patterns
+  const dangerousPatterns = [
+    /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+    /javascript:/gi,
+    /vbscript:/gi,
+    /onload\s*=/gi,
+    /onerror\s*=/gi,
+    /onclick\s*=/gi,
+  ];
+
+  dangerousPatterns.forEach(pattern => {
+    if (pattern.test(sanitized)) {
+      warnings.push('Suspicious content detected and removed');
+      sanitized = sanitized.replace(pattern, '');
+    }
+  });
+
+  // Limit length
+  if (sanitized.length > 50000) {
+    warnings.push('Input truncated to 50000 characters');
+    sanitized = sanitized.substring(0, 50000);
+  }
+
+  return { sanitized, warnings };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,6 +50,16 @@ serve(async (req) => {
       throw new Error('Histórico de carreira e objetivo são obrigatórios');
     }
 
+    // Sanitize inputs
+    const sanitizedCareerHistory = sanitizeUserInput(career_history);
+    const sanitizedSkills = skills ? sanitizeUserInput(skills) : { sanitized: '', warnings: [] };
+    const sanitizedGoal = sanitizeUserInput(long_term_goal);
+
+    const allWarnings = [...sanitizedCareerHistory.warnings, ...sanitizedSkills.warnings, ...sanitizedGoal.warnings];
+    if (allWarnings.length > 0) {
+      console.warn('Input sanitization warnings:', allWarnings);
+    }
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
@@ -28,19 +69,37 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Career GPS analysis for goal:', long_term_goal);
+    // Rate limiting check for authenticated users
+    if (user_id) {
+      const { data: rateLimitOk } = await supabase.rpc('check_rate_limit', {
+        p_user_id: user_id,
+        p_module_name: 'career-gps',
+        p_limit_per_hour: 10
+      });
+
+      if (!rateLimitOk) {
+        return new Response(JSON.stringify({
+          error: 'Rate limit exceeded. Please try again later.'
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    console.log('Career GPS analysis for goal:', sanitizedGoal.sanitized.substring(0, 100));
 
     const prompt = `
     Você é um consultor de carreira sênior especializado em análise de trajetórias profissionais. Analise o perfil fornecido e crie um plano de desenvolvimento estratégico.
 
     HISTÓRICO DE CARREIRA:
-    ${career_history}
+    ${sanitizedCareerHistory.sanitized}
 
     COMPETÊNCIAS ATUAIS:
-    ${skills || 'Não informado'}
+    ${sanitizedSkills.sanitized || 'Não informado'}
 
     OBJETIVO DE LONGO PRAZO:
-    ${long_term_goal}
+    ${sanitizedGoal.sanitized}
 
     PRAZO DESEJADO:
     ${timeline_years || 3} anos
@@ -162,11 +221,23 @@ serve(async (req) => {
             user_id,
             module_id: moduleData.id,
             session_type: 'career_planning',
-            input_data: { career_history, skills, long_term_goal, timeline_years },
+            input_data: { 
+              career_history: sanitizedCareerHistory.sanitized, 
+              skills: sanitizedSkills.sanitized, 
+              long_term_goal: sanitizedGoal.sanitized, 
+              timeline_years 
+            },
             ai_response: analysis,
             score: analysis.success_probability,
             completed: true
           });
+
+        // Log API usage
+        await supabase.rpc('log_api_usage', {
+          p_user_id: user_id,
+          p_module_name: 'career-gps',
+          p_function_name: 'career_analysis'
+        });
       }
     }
 

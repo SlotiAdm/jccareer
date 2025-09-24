@@ -100,8 +100,11 @@ export default function ModuleStats({ moduleId }: Props) {
     return 'text-red-600';
   };
 
+  // Check if this is communication-lab module to hide time metric
+  const isCommunicationLab = moduleId === 'communication-lab' || moduleId === 'communication_lab';
+  
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div className={`grid gap-4 mb-6 ${isCommunicationLab ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>
       <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -142,19 +145,22 @@ export default function ModuleStats({ moduleId }: Props) {
         </CardContent>
       </Card>
 
-      <Card className="bg-gradient-to-br from-orange-50 to-orange-100">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-orange-600 font-medium">Tempo Total</p>
-              <p className="text-lg font-bold text-orange-900">
-                {formatTime(stats.total_time)}
-              </p>
+      {/* Hide time metric for Communication Lab */}
+      {!isCommunicationLab && (
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-orange-600 font-medium">Tempo Total</p>
+                <p className="text-lg font-bold text-orange-900">
+                  {formatTime(stats.total_time)}
+                </p>
+              </div>
+              <Clock className="h-5 w-5 text-orange-600" />
             </div>
-            <Clock className="h-5 w-5 text-orange-600" />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

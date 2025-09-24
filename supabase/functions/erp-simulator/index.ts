@@ -55,15 +55,21 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Rate limiting check for authenticated users
     if (user_id) {
-      const { data: rateLimitCheck } = await supabase.rpc('check_rate_limit', {
+      const { data: rateLimitOk } = await supabase.rpc('check_rate_limit', {
         p_user_id: user_id,
-        p_module_name: 'erp_simulator',
-        p_limit_per_hour: 20
+        p_module_name: 'erp-simulator',
+        p_limit_per_hour: 15
       });
 
-      if (!rateLimitCheck) {
-        throw new Error('Rate limit exceeded. Please try again later.');
+      if (!rateLimitOk) {
+        return new Response(JSON.stringify({
+          error: 'Rate limit exceeded. Please try again later.'
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
     }
 
@@ -191,8 +197,14 @@ serve(async (req) => {
             input_data: { business_problem: sanitizedProblem, user_solution: sanitizedSolution },
             ai_response: analysis,
             score: analysis.user_solution_feedback?.accuracy_score || null,
-            completed: true
           });
+
+        // Log API usage
+        await supabase.rpc('log_api_usage', {
+          p_user_id: user_id,
+          p_module_name: 'erp-simulator', 
+          p_function_name: 'erp_analysis'
+        });
       }
     }
 

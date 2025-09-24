@@ -191,7 +191,10 @@ export default function Dashboard() {
                             <p className="text-sm text-gray-600 mb-4 line-clamp-2">{module.description}</p>
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-4 text-xs text-gray-500">
-                                <span>⏱️ {module.estimated_time_minutes}min</span>
+                                {/* Hide time metric for Communication Lab */}
+                                {module.name !== 'communication_lab' && (
+                                  <span>⏱️ {module.estimated_time_minutes}min</span>
+                                )}
                                 <span>💎 {module.points_reward}pts</span>
                               </div>
                             </div>
@@ -209,6 +212,14 @@ export default function Dashboard() {
                                   navigate('/erp-simulator');
                                 } else if (module.name === 'erp_training') {
                                   navigate('/erp-training');
+                                } else if (module.name === 'communication_lab') {
+                                  navigate('/communication-lab');
+                                } else if (module.name === 'bsc_strategic') {
+                                  navigate('/bsc-strategic');
+                                } else if (module.name === 'career_gps') {
+                                  navigate('/training/career_gps');
+                                } else if (module.name === 'curriculum_analysis') {
+                                  navigate('/resume-analyzer');
                                 } else {
                                   navigate(`/training/${module.name}`);
                                 }
@@ -251,7 +262,7 @@ export default function Dashboard() {
                   </p>
                   <Badge variant="outline">Incluído na sua assinatura</Badge>
                 </div>
-                <Button className="gap-2">
+                <Button className="gap-2" onClick={() => window.open('https://hotmart.com/', '_blank')}>
                   <ExternalLink className="h-4 w-4" />
                   Acessar na Hotmart
                 </Button>
