@@ -69,6 +69,22 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/spreadsheet-arena" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <SpreadsheetArenaPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/erp-simulator" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <ErpSimulator />
+                </ProtectedRoute>
+              } 
+            />
             
             {/* Settings sempre acessível para usuários logados */}
             <Route 

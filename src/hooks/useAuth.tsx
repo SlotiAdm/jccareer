@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         toast({
           title: "Login realizado com sucesso!",
-          description: "Bem-vindo de volta ao Terminal.",
+          description: "Bem-vindo de volta ao BussulaC.",
         });
       }
       

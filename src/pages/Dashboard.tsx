@@ -198,9 +198,13 @@ export default function Dashboard() {
                               disabled={isLocked}
                               onClick={() => {
                                 if (isLocked) return;
-                                // Usar a rota direta para interview_dojo
+                                // Rotas dedicadas para módulos especiais
                                 if (module.name === 'interview_dojo') {
                                   navigate('/interview-dojo');
+                                } else if (module.name === 'spreadsheet_arena') {
+                                  navigate('/spreadsheet-arena');
+                                } else if (module.name === 'erp_simulator') {
+                                  navigate('/erp-simulator');
                                 } else {
                                   navigate(`/training/${module.name}`);
                                 }

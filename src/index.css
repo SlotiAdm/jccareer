@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* O Terminal Design System - Cores profissionais em HSL */
+/* BussulaC Design System - Cores profissionais em HSL */
 
 @layer base {
   :root {
@@ -52,7 +52,7 @@
 
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* Terminal specific tokens */
+    /* BussulaC specific tokens */
     --terminal-green: 160 100% 34%; /* Cor destaque principal */
     --terminal-green-hover: 160 100% 30%;
     --terminal-text: 28 10% 17%; /* Texto principal */
@@ -145,7 +145,7 @@
     background: var(--gradient-hero);
   }
   
-  .shadow-terminal {
+  .shadow-bussula {
     box-shadow: var(--shadow-soft);
   }
 }
