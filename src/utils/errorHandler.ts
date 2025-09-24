@@ -4,47 +4,62 @@ export interface ApiError {
   details?: any;
 }
 
+// Códigos de erro padronizados
 export const ERROR_CODES = {
-  // Authentication
-  AUTH_REQUIRED: 'AUTH_REQUIRED',
-  AUTH_INVALID: 'AUTH_INVALID',
-  
-  // Access Control
+  // Autenticação e Acesso
+  UNAUTHORIZED: 'UNAUTHORIZED',
   ACCESS_DENIED: 'ACCESS_DENIED',
   TRIAL_EXPIRED: 'TRIAL_EXPIRED',
   SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED',
   
-  // Module Errors
+  // Rate Limiting
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  
+  // Módulos
   MODULE_NOT_FOUND: 'MODULE_NOT_FOUND',
-  MODULE_INACTIVE: 'MODULE_INACTIVE',
-  
-  // API Errors
-  API_ERROR: 'API_ERROR',
-  RATE_LIMIT: 'RATE_LIMIT',
-  TIMEOUT: 'TIMEOUT',
-  
-  // Data Errors
   INVALID_INPUT: 'INVALID_INPUT',
-  DATA_NOT_FOUND: 'DATA_NOT_FOUND',
   
-  // Unknown
-  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+  // API Externa
+  OPENAI_QUOTA_EXCEEDED: 'OPENAI_QUOTA_EXCEEDED',
+  OPENAI_ERROR: 'OPENAI_ERROR',
+  
+  // Dados
+  INVALID_FILE_FORMAT: 'INVALID_FILE_FORMAT',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  
+  // Legacy support
+  AUTH_REQUIRED: 'UNAUTHORIZED',
+  AUTH_INVALID: 'UNAUTHORIZED',
+  MODULE_INACTIVE: 'MODULE_NOT_FOUND',
+  API_ERROR: 'OPENAI_ERROR',
+  RATE_LIMIT: 'RATE_LIMIT_EXCEEDED',
+  TIMEOUT: 'OPENAI_ERROR',
+  DATA_NOT_FOUND: 'MODULE_NOT_FOUND',
+  UNKNOWN_ERROR: 'OPENAI_ERROR',
 } as const;
 
 export const ERROR_MESSAGES: Record<string, string> = {
-  [ERROR_CODES.AUTH_REQUIRED]: 'É necessário fazer login para acessar esta funcionalidade.',
-  [ERROR_CODES.AUTH_INVALID]: 'Sessão expirada. Faça login novamente.',
-  [ERROR_CODES.ACCESS_DENIED]: 'Você não tem permissão para acessar este recurso.',
-  [ERROR_CODES.TRIAL_EXPIRED]: 'Seu período de teste expirou. Faça upgrade para continuar.',
-  [ERROR_CODES.SUBSCRIPTION_REQUIRED]: 'Esta funcionalidade requer uma assinatura ativa.',
-  [ERROR_CODES.MODULE_NOT_FOUND]: 'Módulo não encontrado ou indisponível.',
-  [ERROR_CODES.MODULE_INACTIVE]: 'Este módulo está temporariamente indisponível.',
-  [ERROR_CODES.API_ERROR]: 'Erro interno do servidor. Tente novamente em instantes.',
-  [ERROR_CODES.RATE_LIMIT]: 'Muitas tentativas. Aguarde um momento e tente novamente.',
-  [ERROR_CODES.TIMEOUT]: 'Tempo limite excedido. Verifique sua conexão.',
-  [ERROR_CODES.INVALID_INPUT]: 'Dados inválidos. Verifique as informações fornecidas.',
-  [ERROR_CODES.DATA_NOT_FOUND]: 'Dados não encontrados.',
-  [ERROR_CODES.UNKNOWN_ERROR]: 'Erro inesperado. Tente novamente.',
+  UNAUTHORIZED: 'Você precisa estar logado para acessar este recurso.',
+  ACCESS_DENIED: 'Acesso negado. Verifique suas permissões.',
+  TRIAL_EXPIRED: 'Seu período de teste expirou. Faça upgrade para continuar.',
+  SUBSCRIPTION_REQUIRED: 'Esta funcionalidade requer uma assinatura ativa.',
+  RATE_LIMIT_EXCEEDED: 'Você excedeu o limite de uso. Tente novamente em alguns minutos.',
+  MODULE_NOT_FOUND: 'Módulo não encontrado ou indisponível.',
+  INVALID_INPUT: 'Os dados fornecidos são inválidos.',
+  OPENAI_QUOTA_EXCEEDED: 'Limite de uso da IA atingido. Tente novamente mais tarde.',
+  OPENAI_ERROR: 'Erro no serviço de IA. Tente novamente.',
+  INVALID_FILE_FORMAT: 'Formato de arquivo não suportado.',
+  FILE_TOO_LARGE: 'Arquivo muito grande. Limite máximo: 10MB.',
+  
+  // Legacy mappings
+  AUTH_REQUIRED: 'É necessário fazer login para acessar esta funcionalidade.',
+  AUTH_INVALID: 'Sessão expirada. Faça login novamente.',
+  MODULE_INACTIVE: 'Este módulo está temporariamente indisponível.',
+  API_ERROR: 'Erro interno do servidor. Tente novamente em instantes.',
+  RATE_LIMIT: 'Muitas tentativas. Aguarde um momento e tente novamente.',
+  TIMEOUT: 'Tempo limite excedido. Verifique sua conexão.',
+  DATA_NOT_FOUND: 'Dados não encontrados.',
+  UNKNOWN_ERROR: 'Erro inesperado. Tente novamente.',
 };
 
 export class BussulaError extends Error {
@@ -75,28 +90,32 @@ export const handleApiError = (error: any): BussulaError => {
   // Verifica mensagens de erro conhecidas
   const errorMessage = error?.message || error?.toString() || '';
   
+  if (errorMessage.includes('insufficient_quota') || errorMessage.includes('quota')) {
+    return new BussulaError('OPENAI_QUOTA_EXCEEDED');
+  }
+  
+  if (errorMessage.includes('Rate limit') || error?.status === 429) {
+    return new BussulaError('RATE_LIMIT_EXCEEDED');
+  }
+  
   if (errorMessage.includes('unauthorized') || errorMessage.includes('401')) {
-    return new BussulaError(ERROR_CODES.AUTH_INVALID);
+    return new BussulaError('UNAUTHORIZED');
   }
   
   if (errorMessage.includes('forbidden') || errorMessage.includes('403')) {
-    return new BussulaError(ERROR_CODES.ACCESS_DENIED);
-  }
-  
-  if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
-    return new BussulaError(ERROR_CODES.RATE_LIMIT);
+    return new BussulaError('ACCESS_DENIED');
   }
   
   if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-    return new BussulaError(ERROR_CODES.TIMEOUT);
+    return new BussulaError('OPENAI_ERROR', errorMessage);
   }
   
   if (errorMessage.includes('not found') || errorMessage.includes('404')) {
-    return new BussulaError(ERROR_CODES.DATA_NOT_FOUND);
+    return new BussulaError('MODULE_NOT_FOUND');
   }
 
   // Erro genérico
-  return new BussulaError(ERROR_CODES.UNKNOWN_ERROR, errorMessage, error);
+  return new BussulaError('OPENAI_ERROR', errorMessage, error);
 };
 
 export const getErrorMessage = (error: any): string => {
