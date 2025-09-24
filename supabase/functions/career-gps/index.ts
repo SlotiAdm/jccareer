@@ -44,7 +44,45 @@ serve(async (req) => {
   }
 
   try {
-    const { career_history, skills, long_term_goal, timeline_years, user_id } = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
+    if (!supabaseUrl || !supabaseKey || !openAIApiKey) {
+      console.error('Missing environment variables');
+      return new Response(JSON.stringify({ 
+        error: 'Configuração do servidor incompleta' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { career_history, skills, long_term_goal, timeline_years } = await req.json();
     
     if (!career_history || !long_term_goal) {
       throw new Error('Histórico de carreira e objetivo são obrigatórios');
@@ -60,31 +98,32 @@ serve(async (req) => {
       console.warn('Input sanitization warnings:', allWarnings);
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+    // Token system - check and deduct tokens BEFORE calling OpenAI
+    const tokenCost = 130; // Token cost for career GPS
+    
+    const { data: hasTokens, error: tokenError } = await supabase.rpc('check_and_deduct_tokens', {
+      p_user_id: user.id,
+      p_token_cost: tokenCost
+    });
+
+    if (tokenError) {
+      console.error('Token check error:', tokenError);
+      return new Response(JSON.stringify({ 
+        error: 'Erro interno. Tente novamente.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Rate limiting check for authenticated users
-    if (user_id) {
-      const { data: rateLimitOk } = await supabase.rpc('check_rate_limit', {
-        p_user_id: user_id,
-        p_module_name: 'career-gps',
-        p_limit_per_hour: 10
+    if (!hasTokens) {
+      return new Response(JSON.stringify({ 
+        error: 'Tokens insuficientes. Renove sua assinatura ou aguarde a renovação mensal.',
+        errorCode: 'INSUFFICIENT_TOKENS'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-
-      if (!rateLimitOk) {
-        return new Response(JSON.stringify({
-          error: 'Rate limit exceeded. Please try again later.'
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
     }
 
     console.log('Career GPS analysis for goal:', sanitizedGoal.sanitized.substring(0, 100));

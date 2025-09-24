@@ -40,7 +40,45 @@ serve(async (req) => {
   }
 
   try {
-    const { business_problem, user_solution, user_id } = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
+    if (!supabaseUrl || !supabaseKey || !openAIApiKey) {
+      console.error('Missing environment variables');
+      return new Response(JSON.stringify({ 
+        error: 'Configuração do servidor incompleta' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { business_problem, user_solution } = await req.json();
     
     if (!business_problem) {
       throw new Error('Problema de negócio é obrigatório');
@@ -50,32 +88,32 @@ serve(async (req) => {
     const sanitizedProblem = sanitizeUserInput(business_problem).sanitized;
     const sanitizedSolution = user_solution ? sanitizeUserInput(user_solution).sanitized : null;
 
-    // Rate limiting check
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Token system - check and deduct tokens BEFORE calling OpenAI
+    const tokenCost = 120; // Token cost for ERP simulator
+    
+    const { data: hasTokens, error: tokenError } = await supabase.rpc('check_and_deduct_tokens', {
+      p_user_id: user.id,
+      p_token_cost: tokenCost
+    });
 
-    // Rate limiting check for authenticated users
-    if (user_id) {
-      const { data: rateLimitOk } = await supabase.rpc('check_rate_limit', {
-        p_user_id: user_id,
-        p_module_name: 'erp-simulator',
-        p_limit_per_hour: 15
+    if (tokenError) {
+      console.error('Token check error:', tokenError);
+      return new Response(JSON.stringify({ 
+        error: 'Erro interno. Tente novamente.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-
-      if (!rateLimitOk) {
-        return new Response(JSON.stringify({
-          error: 'Rate limit exceeded. Please try again later.'
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+    if (!hasTokens) {
+      return new Response(JSON.stringify({ 
+        error: 'Tokens insuficientes. Renove sua assinatura ou aguarde a renovação mensal.',
+        errorCode: 'INSUFFICIENT_TOKENS'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('ERP simulation for problem:', sanitizedProblem.substring(0, 100));
@@ -180,30 +218,33 @@ serve(async (req) => {
     }
 
     // Save simulation session
-    if (user_id) {
-      const { data: moduleData } = await supabase
-        .from('training_modules')
-        .select('id')
-        .eq('name', 'erp_simulator')
-        .single();
+    const { data: moduleData } = await supabase
+      .from('training_modules')
+      .select('id')
+      .eq('name', 'erp_simulator')
+      .single();
 
-      if (moduleData) {
-        await supabase
-          .from('simulation_sessions')
-          .insert({
-            user_id,
-            module_id: moduleData.id,
-            session_type: 'erp_simulation',
-            input_data: { business_problem: sanitizedProblem, user_solution: sanitizedSolution },
-            ai_response: analysis,
-            score: analysis.user_solution_feedback?.accuracy_score || null,
-          });
+    if (moduleData) {
+      await supabase
+        .from('simulation_sessions')
+        .insert({
+          user_id: user.id,
+          module_id: moduleData.id,
+          session_type: 'erp_simulation',
+          input_data: { business_problem: sanitizedProblem, user_solution: sanitizedSolution },
+          ai_response: analysis,
+          feedback: `Simulação ERP concluída. Problema analisado: ${analysis.problem_analysis?.business_area || 'Área não especificada'}`,
+          score: analysis.user_solution_feedback?.accuracy_score || null,
+          completed: true
+        });
 
-        // Log API usage
-        await supabase.rpc('log_api_usage', {
-          p_user_id: user_id,
-          p_module_name: 'erp-simulator', 
-          p_function_name: 'erp_analysis'
+      // Log API cost with proper token usage
+      if (data.usage) {
+        await supabase.rpc('log_api_cost', {
+          p_user_id: user.id,
+          p_module_name: 'erp_simulator',
+          p_prompt_tokens: data.usage.prompt_tokens,
+          p_completion_tokens: data.usage.completion_tokens
         });
       }
     }

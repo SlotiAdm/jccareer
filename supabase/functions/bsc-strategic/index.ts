@@ -99,20 +99,30 @@ serve(async (req) => {
       });
     }
 
-    // Rate limiting check
-    const { data: rateLimitData, error: rateLimitError } = await supabase
-      .rpc('check_rate_limit', {
-        p_user_id: user.id,
-        p_module_name: 'bsc_strategic',
-        p_limit_per_hour: 5
-      });
+    // Token system - check and deduct tokens BEFORE calling OpenAI
+    const tokenCost = 150; // Token cost for BSC Strategic
+    
+    const { data: hasTokens, error: tokenError } = await supabase.rpc('check_and_deduct_tokens', {
+      p_user_id: user.id,
+      p_token_cost: tokenCost
+    });
 
-    if (rateLimitError || !rateLimitData) {
-      console.error('Rate limit check failed:', rateLimitError);
+    if (tokenError) {
+      console.error('Token check error:', tokenError);
       return new Response(JSON.stringify({ 
-        error: 'Limite de uso excedido. Tente novamente em uma hora.' 
+        error: 'Erro interno. Tente novamente.' 
       }), {
-        status: 429,
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!hasTokens) {
+      return new Response(JSON.stringify({ 
+        error: 'Tokens insuficientes. Renove sua assinatura ou aguarde a renovação mensal.',
+        errorCode: 'INSUFFICIENT_TOKENS'
+      }), {
+        status: 402,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -381,15 +391,15 @@ Garanta que o BSC seja coerente, com objetivos interconectados entre as perspect
       // Continue without throwing error
     }
 
-    // Log API usage
-    await supabase.rpc('log_api_usage', {
-      p_user_id: user.id,
-      p_module_name: 'bsc_strategic',
-      p_function_name: 'generate_bsc',
-      p_input_tokens: data.usage?.prompt_tokens || 0,
-      p_output_tokens: data.usage?.completion_tokens || 0,
-      p_cost_estimate: ((data.usage?.prompt_tokens || 0) * 0.00015 + (data.usage?.completion_tokens || 0) * 0.0002) / 1000
-    });
+    // Log API cost with proper token usage
+    if (data.usage) {
+      await supabase.rpc('log_api_cost', {
+        p_user_id: user.id,
+        p_module_name: 'bsc_strategic',
+        p_prompt_tokens: data.usage.prompt_tokens,
+        p_completion_tokens: data.usage.completion_tokens
+      });
+    }
 
     console.log('BSC Strategic completed successfully');
 
