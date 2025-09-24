@@ -16,6 +16,9 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import SpreadsheetArenaPage from "./pages/SpreadsheetArenaPage";
 import ErpSimulator from "./pages/ErpSimulator";
+import ResumeAnalyzer from "./pages/ResumeAnalyzer";
+import CommunicationLab from "./pages/CommunicationLab";
+import BSCStrategic from "./pages/BSCStrategic";
 
 // Configurar QueryClient com otimizações de performance
 const queryClient = new QueryClient({
@@ -82,6 +85,30 @@ const App = () => (
               element={
                 <ProtectedRoute requiresActiveSubscription>
                   <ErpSimulator />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/resume-analyzer" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <ResumeAnalyzer />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/communication-lab" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <CommunicationLab />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/bsc-strategic" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <BSCStrategic />
                 </ProtectedRoute>
               } 
             />

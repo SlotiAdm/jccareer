@@ -14,6 +14,186 @@ export type Database = {
   }
   public: {
     Tables: {
+      career_profiles: {
+        Row: {
+          achievements: Json | null
+          bsc_customers: Json | null
+          bsc_financial: Json | null
+          bsc_learning: Json | null
+          bsc_processes: Json | null
+          career_analysis: Json | null
+          career_goals: Json | null
+          career_paths: Json | null
+          certifications: Json | null
+          created_at: string
+          current_company: string | null
+          current_position: string | null
+          current_salary: number | null
+          education_level: string | null
+          full_name: string | null
+          hard_skills: Json | null
+          id: string
+          industry: string | null
+          languages: Json | null
+          learning_goals: Json | null
+          location: string | null
+          salary_goals: Json | null
+          soft_skills: Json | null
+          updated_at: string
+          user_id: string
+          work_history: Json | null
+          years_experience: number | null
+        }
+        Insert: {
+          achievements?: Json | null
+          bsc_customers?: Json | null
+          bsc_financial?: Json | null
+          bsc_learning?: Json | null
+          bsc_processes?: Json | null
+          career_analysis?: Json | null
+          career_goals?: Json | null
+          career_paths?: Json | null
+          certifications?: Json | null
+          created_at?: string
+          current_company?: string | null
+          current_position?: string | null
+          current_salary?: number | null
+          education_level?: string | null
+          full_name?: string | null
+          hard_skills?: Json | null
+          id?: string
+          industry?: string | null
+          languages?: Json | null
+          learning_goals?: Json | null
+          location?: string | null
+          salary_goals?: Json | null
+          soft_skills?: Json | null
+          updated_at?: string
+          user_id: string
+          work_history?: Json | null
+          years_experience?: number | null
+        }
+        Update: {
+          achievements?: Json | null
+          bsc_customers?: Json | null
+          bsc_financial?: Json | null
+          bsc_learning?: Json | null
+          bsc_processes?: Json | null
+          career_analysis?: Json | null
+          career_goals?: Json | null
+          career_paths?: Json | null
+          certifications?: Json | null
+          created_at?: string
+          current_company?: string | null
+          current_position?: string | null
+          current_salary?: number | null
+          education_level?: string | null
+          full_name?: string | null
+          hard_skills?: Json | null
+          id?: string
+          industry?: string | null
+          languages?: Json | null
+          learning_goals?: Json | null
+          location?: string | null
+          salary_goals?: Json | null
+          soft_skills?: Json | null
+          updated_at?: string
+          user_id?: string
+          work_history?: Json | null
+          years_experience?: number | null
+        }
+        Relationships: []
+      }
+      communication_analysis: {
+        Row: {
+          ai_analysis: Json
+          analysis_type: string
+          created_at: string
+          id: string
+          input_text: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis: Json
+          analysis_type: string
+          created_at?: string
+          id?: string
+          input_text: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json
+          analysis_type?: string
+          created_at?: string
+          id?: string
+          input_text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      erp_progress: {
+        Row: {
+          completed: boolean | null
+          created_at: string
+          id: string
+          score: number | null
+          stage: string
+          stage_data: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string
+          id?: string
+          score?: number | null
+          stage: string
+          stage_data?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string
+          id?: string
+          score?: number | null
+          stage?: string
+          stage_data?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      generated_resumes: {
+        Row: {
+          created_at: string
+          generated_resume: string
+          id: string
+          improvements_notes: Json | null
+          job_description: string
+          original_resume: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          generated_resume: string
+          id?: string
+          improvements_notes?: Json | null
+          job_description: string
+          original_resume?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          generated_resume?: string
+          id?: string
+          improvements_notes?: Json | null
+          job_description?: string
+          original_resume?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       module_configurations: {
         Row: {
           created_at: string
