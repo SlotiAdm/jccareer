@@ -33,6 +33,7 @@ export default function SessionHistory() {
   const [modules, setModules] = useState<TrainingModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<SimulationSession | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("list");
 
   const getIcon = (iconName: string) => {
     const icons = {
@@ -141,7 +142,7 @@ export default function SessionHistory() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="list" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList>
             <TabsTrigger value="list">Lista</TabsTrigger>
             <TabsTrigger value="details">Detalhes</TabsTrigger>
@@ -155,8 +156,13 @@ export default function SessionHistory() {
               return (
                 <div
                   key={session.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  onClick={() => setSelectedSession(session)}
+                  className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
+                    selectedSession?.id === session.id ? 'bg-primary/5 border-primary' : ''
+                  }`}
+                  onClick={() => {
+                    setSelectedSession(session);
+                    setActiveTab("details");
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     <IconComponent className="h-5 w-5 text-primary" />
@@ -234,10 +240,62 @@ export default function SessionHistory() {
                     
                     {selectedSession.ai_response && (
                       <div>
-                        <span className="text-sm font-medium">Resultado da IA:</span>
-                        <pre className="mt-1 text-xs bg-gray-100 p-3 rounded overflow-auto max-h-64">
-                          {JSON.stringify(selectedSession.ai_response, null, 2)}
-                        </pre>
+                        <span className="text-sm font-medium">Análise da IA:</span>
+                        <div className="mt-3 space-y-4">
+                          {/* Display analysis sections in a readable format */}
+                          {Object.entries(selectedSession.ai_response).map(([key, value]) => {
+                            if (typeof value === 'string' && value.length > 0) {
+                              return (
+                                <div key={key} className="border-l-4 border-l-primary/20 pl-4">
+                                  <h5 className="font-medium text-sm capitalize mb-2">
+                                    {key.replace(/_/g, ' ')}
+                                  </h5>
+                                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{value}</p>
+                                </div>
+                              );
+                            } else if (Array.isArray(value) && value.length > 0) {
+                              return (
+                                <div key={key} className="border-l-4 border-l-primary/20 pl-4">
+                                  <h5 className="font-medium text-sm capitalize mb-2">
+                                    {key.replace(/_/g, ' ')}
+                                  </h5>
+                                  <ul className="text-sm text-gray-700 space-y-1">
+                                    {value.map((item, index) => (
+                                      <li key={index} className="flex items-start gap-2">
+                                        <span className="text-primary">•</span>
+                                        <span>{typeof item === 'string' ? item : JSON.stringify(item)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            } else if (typeof value === 'object' && value !== null) {
+                              return (
+                                <div key={key} className="border-l-4 border-l-primary/20 pl-4">
+                                  <h5 className="font-medium text-sm capitalize mb-2">
+                                    {key.replace(/_/g, ' ')}
+                                  </h5>
+                                  <div className="text-sm text-gray-700 space-y-2">
+                                    {Object.entries(value as any).map(([subKey, subValue]) => (
+                                      <div key={subKey} className="flex gap-2">
+                                        <span className="font-medium capitalize min-w-fit">{subKey.replace(/_/g, ' ')}:</span>
+                                        <span>{typeof subValue === 'string' || typeof subValue === 'number' ? subValue : JSON.stringify(subValue)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })}
+                          
+                          {/* Fallback for complex structures */}
+                          {Object.keys(selectedSession.ai_response).length === 0 && (
+                            <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
+                              Nenhum conteúdo de análise disponível.
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
