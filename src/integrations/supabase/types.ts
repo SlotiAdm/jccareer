@@ -249,6 +249,10 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: string
       }
+      increment_free_session: {
+        Args: { user_id_param: string }
+        Returns: boolean
+      }
       start_user_trial: {
         Args: { user_id_param: string }
         Returns: undefined
