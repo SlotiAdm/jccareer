@@ -236,10 +236,13 @@ export type Database = {
           id: string
           is_admin: boolean | null
           last_hotmart_update: string | null
+          strategist_level: number | null
+          strategist_title: string | null
           subscription_end_date: string | null
           subscription_plan: string | null
           subscription_start_date: string | null
           subscription_status: string | null
+          total_points: number | null
           trial_end_date: string | null
           trial_start_date: string | null
           updated_at: string
@@ -256,10 +259,13 @@ export type Database = {
           id?: string
           is_admin?: boolean | null
           last_hotmart_update?: string | null
+          strategist_level?: number | null
+          strategist_title?: string | null
           subscription_end_date?: string | null
           subscription_plan?: string | null
           subscription_start_date?: string | null
           subscription_status?: string | null
+          total_points?: number | null
           trial_end_date?: string | null
           trial_start_date?: string | null
           updated_at?: string
@@ -276,10 +282,13 @@ export type Database = {
           id?: string
           is_admin?: boolean | null
           last_hotmart_update?: string | null
+          strategist_level?: number | null
+          strategist_title?: string | null
           subscription_end_date?: string | null
           subscription_plan?: string | null
           subscription_start_date?: string | null
           subscription_status?: string | null
+          total_points?: number | null
           trial_end_date?: string | null
           trial_start_date?: string | null
           updated_at?: string
@@ -451,6 +460,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_badges: {
+        Row: {
+          criteria: Json
+          description: string
+          earned_at: string
+          icon: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          criteria?: Json
+          description: string
+          earned_at?: string
+          icon: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          criteria?: Json
+          description?: string
+          earned_at?: string
+          icon?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_module_completions: {
         Row: {
           completed_at: string
@@ -488,6 +527,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_module_progress: {
+        Row: {
+          avg_score: number | null
+          created_at: string
+          id: string
+          last_activity: string | null
+          mastery_level: number | null
+          module_name: string
+          sessions_completed: number | null
+          streak_count: number | null
+          total_time_spent: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_score?: number | null
+          created_at?: string
+          id?: string
+          last_activity?: string | null
+          mastery_level?: number | null
+          module_name: string
+          sessions_completed?: number | null
+          streak_count?: number | null
+          total_time_spent?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_score?: number | null
+          created_at?: string
+          id?: string
+          last_activity?: string | null
+          mastery_level?: number | null
+          module_name?: string
+          sessions_completed?: number | null
+          streak_count?: number | null
+          total_time_spent?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_progress: {
         Row: {
