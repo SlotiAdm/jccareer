@@ -412,6 +412,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_api_usage: {
+        Row: {
+          cost_estimate: number | null
+          created_at: string
+          function_name: string
+          id: string
+          input_tokens: number | null
+          ip_address: unknown | null
+          module_name: string
+          output_tokens: number | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          cost_estimate?: number | null
+          created_at?: string
+          function_name: string
+          id?: string
+          input_tokens?: number | null
+          ip_address?: unknown | null
+          module_name: string
+          output_tokens?: number | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          cost_estimate?: number | null
+          created_at?: string
+          function_name?: string
+          id?: string
+          input_tokens?: number | null
+          ip_address?: unknown | null
+          module_name?: string
+          output_tokens?: number | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_module_completions: {
         Row: {
           completed_at: string
@@ -491,6 +530,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_backoff_delay: {
+        Args: { attempt_number: number }
+        Returns: unknown
+      }
+      check_rate_limit: {
+        Args: {
+          p_limit_per_hour?: number
+          p_module_name: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       check_trial_status: {
         Args: { user_id_param: string }
         Returns: string
@@ -502,6 +553,17 @@ export type Database = {
       increment_free_session: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      log_api_usage: {
+        Args: {
+          p_cost_estimate?: number
+          p_function_name: string
+          p_input_tokens?: number
+          p_module_name: string
+          p_output_tokens?: number
+          p_user_id: string
+        }
+        Returns: undefined
       }
       log_security_event: {
         Args: {
