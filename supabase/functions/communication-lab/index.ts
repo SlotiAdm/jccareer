@@ -113,6 +113,11 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Resposta inválida da API OpenAI');
+    }
+    
     const analysisText = data.choices[0].message.content;
     
     let analysis;

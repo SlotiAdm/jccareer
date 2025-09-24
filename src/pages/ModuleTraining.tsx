@@ -5,12 +5,12 @@ import { useTrialAccess } from "@/hooks/useTrialAccess";
 import { useProgressTracking } from "@/hooks/useProgressTracking";
 import { supabase } from "@/integrations/supabase/client";
 import { Sidebar } from "@/components/Sidebar";
+import { ModuleInterface } from "@/components/ModuleInterface";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle, CheckCircle, Clock, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Send, RefreshCw, ArrowLeft, Lock } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, ArrowLeft, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -44,10 +44,9 @@ export default function ModuleTraining() {
   const [module, setModule] = useState<TrainingModule | null>(null);
   const [loading, setLoading] = useState(true);
   const [simulationRunning, setSimulationRunning] = useState(false);
-  const [userInput, setUserInput] = useState("");
-  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
   const [canAccess, setCanAccess] = useState(false);
+  const [showInterface, setShowInterface] = useState(true);
 
   const getIcon = (iconName: string) => {
     const icons = {
@@ -106,26 +105,7 @@ export default function ModuleTraining() {
 
         if (error) throw error;
         
-        if (moduleData) {
-          setModule(moduleData);
-          setConversation([{
-            role: 'assistant',
-            content: getWelcomeMessage(moduleData),
-            timestamp: new Date().toISOString()
-          }]);
-        }
-      } catch (error) {
-        console.error('Error fetching module:', error);
-        navigate('/dashboard');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchModule();
-  }, [moduleName, navigate, trialAccess]);
-
-  const startSimulation = async () => {
+  const startSimulation = async (data: any) => {
     if (!module || !user || !canAccess) return;
     
     const canUseSession = await trialAccess.useSession();
@@ -141,44 +121,31 @@ export default function ModuleTraining() {
 
     try {
       setSimulationRunning(true);
-      
-      const startMessage: ConversationMessage = {
-        role: 'user',
-        content: userInput,
-        timestamp: new Date().toISOString()
-      };
-      
-      setConversation(prev => [...prev, startMessage]);
-      setUserInput("");
 
       const functionName = getFunctionName(module.name);
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { 
-          userInput,
-          conversationHistory: conversation,
-          moduleContext: module
-        }
+      
+      // Preparar dados baseado no tipo de módulo
+      let requestBody: any = { ...data, user_id: user.id };
+
+      const { data: responseData, error } = await supabase.functions.invoke(functionName, {
+        body: requestBody
       });
 
       if (error) throw error;
 
-      const aiResponse: ConversationMessage = {
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date().toISOString(),
-        score: data.score,
-        feedback: data.feedback
-      };
-      
-      setConversation(prev => [...prev, aiResponse]);
+      setResult(responseData);
+      setShowInterface(false);
 
-      if (data.score !== undefined) {
-        await updateProgress({
-          moduleId: module.id,
-          score: data.score,
-          completionData: { conversation, finalScore: data.score }
-        });
-      }
+      await updateProgress({
+        moduleId: module.id,
+        score: responseData.analysis?.overall_score || 85,
+        completionData: { result: responseData }
+      });
+
+      toast({
+        title: "Simulação concluída!",
+        description: "Confira os resultados abaixo.",
+      });
 
     } catch (error) {
       console.error('Error running simulation:', error);
@@ -196,7 +163,7 @@ export default function ModuleTraining() {
     return (
       <div className="flex h-screen bg-terminal-light">
         <Sidebar />
-        <div className="flex-1 ml-64 flex items-center justify-center">
+        <div className="flex-1 lg:ml-64 flex items-center justify-center pt-16 lg:pt-0">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-terminal-text">Carregando módulo...</p>
@@ -210,7 +177,7 @@ export default function ModuleTraining() {
     return (
       <div className="flex h-screen bg-terminal-light">
         <Sidebar />
-        <div className="flex-1 ml-64 flex items-center justify-center p-8">
+        <div className="flex-1 lg:ml-64 flex items-center justify-center p-8 pt-20 lg:pt-8">
           <Card className="w-full max-w-md text-center">
             <CardHeader>
               <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
@@ -243,7 +210,7 @@ export default function ModuleTraining() {
     <div className="flex h-screen bg-terminal-light">
       <Sidebar />
       
-      <main className="flex-1 ml-64 overflow-hidden">
+      <main className="flex-1 lg:ml-64 overflow-hidden pt-16 lg:pt-0">
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="border-b bg-white p-6">
@@ -274,65 +241,43 @@ export default function ModuleTraining() {
 
           {/* Chat Area */}
           <div className="flex-1 flex flex-col">
+          {/* Module Interface or Results */}
+          <div className="h-full flex flex-col">
             <ScrollArea className="flex-1 p-6">
-              <div className="space-y-4 max-w-4xl mx-auto">
-                {conversation.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex gap-4 ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[80%] p-4 rounded-lg ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-white border shadow-sm'
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
-                      {message.score && (
-                        <div className="mt-2 pt-2 border-t">
-                          <Badge variant="outline">Score: {message.score}%</Badge>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="max-w-4xl mx-auto">
+                {showInterface ? (
+                  <ModuleInterface
+                    moduleName={module.name}
+                    onSubmit={startSimulation}
+                    isLoading={simulationRunning}
+                  />
+                ) : result ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Resultados da Simulação</CardTitle>
+                      <CardDescription>
+                        Análise completa com feedback detalhado
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded-lg overflow-auto">
+                        {JSON.stringify(result, null, 2)}
+                      </pre>
+                      <Button 
+                        onClick={() => {
+                          setShowInterface(true);
+                          setResult(null);
+                        }} 
+                        className="mt-4"
+                      >
+                        Nova Simulação
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : null}
               </div>
             </ScrollArea>
-
-            {/* Input Area */}
-            <div className="border-t bg-white p-6">
-              <div className="max-w-4xl mx-auto">
-                <div className="flex gap-4">
-                  <Textarea
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    placeholder="Digite sua mensagem..."
-                    className="min-h-[60px]"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        startSimulation();
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={startSimulation}
-                    disabled={simulationRunning || !userInput.trim()}
-                    className="gap-2"
-                  >
-                    {simulationRunning ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Enviar
-                  </Button>
-                </div>
-              </div>
-            </div>
+          </div>
           </div>
         </div>
       </main>

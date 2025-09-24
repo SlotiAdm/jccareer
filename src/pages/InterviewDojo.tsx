@@ -193,10 +193,10 @@ export default function InterviewDojo() {
     const typeInfo = getInterviewTypeInfo();
     
     return (
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        
-        <main className="flex-1 ml-64 overflow-y-auto">
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      
+      <main className="flex-1 lg:ml-64 overflow-y-auto">
           <div className="p-8 max-w-4xl mx-auto">
             <div className="mb-6">
               <Button
@@ -298,7 +298,7 @@ export default function InterviewDojo() {
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       
-      <main className="flex-1 ml-64 flex flex-col">
+      <main className="flex-1 lg:ml-64 flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">

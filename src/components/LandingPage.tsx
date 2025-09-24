@@ -95,10 +95,12 @@ const LandingPage = () => {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
-              <Trophy className="mr-2 h-5 w-5" />
-              Ver Demo Gratuita
-            </Button>
+            <Link to="/auth">
+              <Button size="lg" variant="outline" className="px-8 py-4 text-lg">
+                <Trophy className="mr-2 h-5 w-5" />
+                Login / Demo Gratuita
+              </Button>
+            </Link>
           </div>
 
           <div className="flex items-center justify-center gap-8 text-sm text-gray-600">

@@ -119,7 +119,7 @@ export default function Dashboard() {
     return (
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
-        <div className="flex-1 ml-64 flex items-center justify-center">
+        <div className="flex-1 lg:ml-64 flex items-center justify-center pt-16 lg:pt-0">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </div>
@@ -130,8 +130,8 @@ export default function Dashboard() {
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       
-      <main className="flex-1 ml-64 overflow-y-auto">
-        <div className="p-8">
+      <main className="flex-1 lg:ml-64 overflow-y-auto">
+        <div className="p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>

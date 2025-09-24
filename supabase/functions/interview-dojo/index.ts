@@ -70,7 +70,16 @@ serve(async (req) => {
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Resposta inválida da API OpenAI');
+      }
+
       const result = JSON.parse(data.choices[0].message.content);
 
       // Create new session
@@ -186,7 +195,16 @@ serve(async (req) => {
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Resposta inválida da API OpenAI');
+      }
+
       const result = JSON.parse(data.choices[0].message.content);
 
       // Update session data
