@@ -249,6 +249,47 @@ export const ModuleInterface = ({ moduleName, onSubmit, isLoading }: ModuleInter
           </div>
         );
 
+      case 'interview_dojo':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="interview_type">Tipo de entrevista</Label>
+              <Select value={formData.interview_type} onValueChange={(value) => setFormData({...formData, interview_type: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo de entrevista" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="behavioral">Entrevista Comportamental</SelectItem>
+                  <SelectItem value="technical">Entrevista Técnica</SelectItem>
+                  <SelectItem value="case_study">Estudo de Caso</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="experience_level">Nível de experiência</Label>
+              <Select value={formData.experience_level} onValueChange={(value) => setFormData({...formData, experience_level: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione seu nível" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="junior">Júnior (0-2 anos)</SelectItem>
+                  <SelectItem value="pleno">Pleno (3-5 anos)</SelectItem>
+                  <SelectItem value="senior">Senior (6+ anos)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="target_role">Cargo desejado (opcional)</Label>
+              <Input
+                id="target_role"
+                placeholder="Ex: Analista de Sistemas, Gerente de Projetos"
+                value={formData.target_role || ''}
+                onChange={(e) => setFormData({...formData, target_role: e.target.value})}
+              />
+            </div>
+          </div>
+        );
+
       default:
         return (
           <div>

@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, interview_type, user_answer, session_id, user_id } = await req.json();
+    const { action, interview_type, user_answer, session_id, user_id, experience_level, target_role } = await req.json();
     
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
@@ -27,23 +27,47 @@ serve(async (req) => {
     console.log('Interview dojo action:', action, 'Type:', interview_type);
 
     if (action === 'start_interview') {
+      // Buscar configurações do módulo se disponível
+      const { data: moduleConfig } = await supabase
+        .from('module_configurations')
+        .select('*')
+        .eq('module_name', 'interview_dojo')
+        .single();
+      
       // Start new interview session
       const interviewTypes = {
-        behavioral: 'entrevista comportamental focada em experiências passadas',
-        technical: 'entrevista técnica para avaliar conhecimentos específicos',
-        case_study: 'estudo de caso para avaliar capacidade analítica'
+        behavioral: 'entrevista comportamental focada em experiências passadas usando método STAR',
+        technical: 'entrevista técnica para avaliar conhecimentos e habilidades específicas',
+        case_study: 'estudo de caso para avaliar capacidade analítica e resolução de problemas'
       };
 
+      const levelDescriptions = {
+        junior: 'nível júnior (0-2 anos de experiência)',
+        pleno: 'nível pleno (3-5 anos de experiência)', 
+        senior: 'nível senior (6+ anos de experiência)'
+      };
+
+      const systemPrompt = moduleConfig?.system_prompt || `
+        Você é um recrutador experiente e rigoroso conduzindo uma entrevista de emprego.
+        Faça perguntas relevantes, específicas e progressivamente mais desafiadoras.
+        Seja profissional, mas humano. Avalie as respostas com critério.
+      `;
+
       const prompt = `
-      Você é um recrutador experiente conduzindo uma ${interviewTypes[interview_type as keyof typeof interviewTypes]}. 
+      ${systemPrompt}
 
-      Inicie a entrevista de forma profissional e natural. Faça UMA pergunta por vez, específica para o tipo de entrevista escolhido.
+      CONTEXTO DA ENTREVISTA:
+      - Tipo: ${interviewTypes[interview_type as keyof typeof interviewTypes]}
+      - Nível do candidato: ${levelDescriptions[experience_level as keyof typeof levelDescriptions] || 'não especificado'}
+      ${target_role ? `- Cargo desejado: ${target_role}` : ''}
 
-      Para entrevista comportamental: foque em situações passadas usando método STAR
-      Para entrevista técnica: faça perguntas sobre conhecimentos e habilidades específicas
-      Para estudo de caso: apresente um problema de negócio para análise
+      Inicie a entrevista de forma profissional e natural. Faça UMA pergunta por vez, específica para o contexto.
 
-      Seja cordial mas profissional. Não faça mais de uma pergunta por resposta.
+      Para entrevista comportamental: foque em situações passadas usando método STAR (Situação, Tarefa, Ação, Resultado)
+      Para entrevista técnica: faça perguntas sobre conhecimentos e habilidades específicas do nível
+      Para estudo de caso: apresente um problema de negócio realista para análise
+
+      Seja cordial mas profissional. Ajuste a dificuldade ao nível de experiência informado.
       
       Responda em JSON:
       {
@@ -60,12 +84,12 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-5-mini-2025-08-07',
           messages: [
             { role: 'system', content: 'You are a professional interviewer. Always respond with valid JSON.' },
             { role: 'user', content: prompt }
           ],
-        max_completion_tokens: maxTokens,
+          max_completion_tokens: 600,
         }),
       });
 
@@ -96,7 +120,13 @@ serve(async (req) => {
             user_id,
             module_id: moduleData.id,
             session_type: `interview_${interview_type}`,
-            input_data: { interview_type, questions: [], answers: [] },
+            input_data: { 
+              interview_type, 
+              experience_level, 
+              target_role,
+              questions: [result.interviewer_message], 
+              answers: [] 
+            },
             completed: false
           })
           .select('id')

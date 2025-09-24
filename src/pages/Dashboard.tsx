@@ -198,6 +198,7 @@ export default function Dashboard() {
                               disabled={isLocked}
                               onClick={() => {
                                 if (isLocked) return;
+                                // Usar a rota direta para interview_dojo
                                 if (module.name === 'interview_dojo') {
                                   navigate('/interview-dojo');
                                 } else {

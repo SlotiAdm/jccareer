@@ -68,7 +68,8 @@ export default function ModuleTraining() {
       'erp_simulator': 'erp-simulator',
       'spreadsheet_arena': 'spreadsheet-arena',
       'bsc_strategic': 'bsc-strategic',
-      'career_gps': 'career-gps'
+      'career_gps': 'career-gps',
+      'interview_dojo': 'interview-dojo'
     };
     return functionMap[moduleName] || moduleName;
   };
@@ -80,22 +81,27 @@ export default function ModuleTraining() {
       'erp_simulator': 'Bem-vindo ao Simulador ERP! Aqui você vai dominar os principais sistemas de gestão empresarial.',
       'spreadsheet_arena': 'Olá! Bem-vindo à Arena de Planilhas! Vamos aprimorar suas habilidades em Excel e análise de dados.',
       'bsc_strategic': 'Bem-vindo ao BSC Estratégico! Vamos construir indicadores de performance e dashboards estratégicos.',
-      'career_gps': 'Olá! Sou seu GPS de Carreira. Vamos planejar sua trajetória profissional de forma estratégica.'
+      'career_gps': 'Olá! Sou seu GPS de Carreira. Vamos planejar sua trajetória profissional de forma estratégica.',
+      'interview_dojo': 'Bem-vindo ao Dojo de Entrevistas! Vamos treinar suas habilidades de entrevista com simulações realistas.'
     };
     return messages[module.name as keyof typeof messages] || `Bem-vindo ao módulo ${module.title}!`;
   };
 
   useEffect(() => {
     const fetchModule = async () => {
-      if (!moduleName) return;
+      if (!moduleName) {
+        navigate('/dashboard');
+        return;
+      }
       
       try {
         setLoading(true);
         
-        // Verificar acesso
+        // Verificar acesso primeiro
         const hasAccess = trialAccess.canAccessModule();
         setCanAccess(hasAccess);
         
+        // Buscar módulo no banco
         const { data: moduleData, error } = await supabase
           .from('training_modules')
           .select('*')
@@ -103,13 +109,30 @@ export default function ModuleTraining() {
           .eq('is_active', true)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching module:', error);
+          toast({
+            title: "Módulo não encontrado",
+            description: "Este módulo não existe ou está inativo.",
+            variant: "destructive"
+          });
+          navigate('/dashboard');
+          return;
+        }
         
         if (moduleData) {
           setModule(moduleData);
+        } else {
+          console.error('Module not found:', moduleName);
+          navigate('/dashboard');
         }
       } catch (error) {
         console.error('Error fetching module:', error);
+        toast({
+          title: "Erro ao carregar módulo",
+          description: "Tente novamente em alguns instantes.",
+          variant: "destructive"
+        });
         navigate('/dashboard');
       } finally {
         setLoading(false);
@@ -117,11 +140,19 @@ export default function ModuleTraining() {
     };
 
     fetchModule();
-  }, [moduleName, navigate, trialAccess]);
+  }, [moduleName, navigate, trialAccess, toast]);
 
   const startSimulation = async (data: any) => {
-    if (!module || !user || !canAccess) return;
+    if (!module || !user || !canAccess) {
+      toast({
+        title: "Erro de acesso",
+        description: "Verifique suas permissões e tente novamente.",
+        variant: "destructive"
+      });
+      return;
+    }
     
+    // Verificar sessões disponíveis
     const canUseSession = await trialAccess.useSession();
     if (!canUseSession) {
       toast({
@@ -137,24 +168,39 @@ export default function ModuleTraining() {
       setSimulationRunning(true);
 
       const functionName = getFunctionName(module.name);
+      console.log(`Starting simulation for module: ${module.name}, function: ${functionName}`);
       
       // Preparar dados baseado no tipo de módulo
-      let requestBody: any = { ...data, user_id: user.id };
+      let requestBody: any = { 
+        ...data, 
+        user_id: user.id,
+        action: module.name === 'interview_dojo' ? 'start_interview' : 'analyze'
+      };
 
       const { data: responseData, error } = await supabase.functions.invoke(functionName, {
         body: requestBody
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function error:', error);
+        throw new Error(error.message || 'Erro na simulação');
+      }
+
+      if (!responseData) {
+        throw new Error('Resposta vazia do servidor');
+      }
 
       setResult(responseData);
       setShowInterface(false);
 
-      await updateProgress({
-        moduleId: module.id,
-        score: responseData.analysis?.overall_score || 85,
-        completionData: { result: responseData }
-      });
+      // Atualizar progresso apenas se não for interview_dojo (que tem seu próprio fluxo)
+      if (module.name !== 'interview_dojo') {
+        await updateProgress({
+          moduleId: module.id,
+          score: responseData.analysis?.overall_score || responseData.score || 85,
+          completionData: { result: responseData }
+        });
+      }
 
       toast({
         title: "Simulação concluída!",
@@ -163,9 +209,10 @@ export default function ModuleTraining() {
 
     } catch (error) {
       console.error('Error running simulation:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido na simulação';
       toast({
         title: "Erro na simulação", 
-        description: "Tente novamente.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
