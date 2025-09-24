@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Upload, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation, Loader2, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useProgressTracking } from "@/hooks/useProgressTracking";
+import ModuleStats from "@/components/ModuleStats";
 
 interface TrainingModule {
   id: string;
@@ -29,6 +31,7 @@ export default function ModuleTraining() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { updateProgress } = useProgressTracking();
   
   const [module, setModule] = useState<TrainingModule | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,6 +122,16 @@ export default function ModuleTraining() {
       if (error) throw error;
       
       setResult(data.analysis);
+      
+      // Update progress
+      if (data.analysis?.overall_score && module) {
+        await updateProgress({
+          moduleId: module.id,
+          score: data.analysis.overall_score,
+          completionData: { analysis: data.analysis }
+        });
+      }
+      
       toast({
         title: "Análise concluída!",
         description: "Seu currículo foi analisado com sucesso.",
@@ -158,6 +171,15 @@ export default function ModuleTraining() {
       if (error) throw error;
       
       setResult(data.analysis);
+      // Update progress
+      if (data.analysis?.overall_score && module) {
+        await updateProgress({
+          moduleId: module.id,
+          score: data.analysis.overall_score,
+          completionData: { analysis: data.analysis }
+        });
+      }
+      
       toast({
         title: "Análise concluída!",
         description: "Seu texto foi analisado e melhorado.",
@@ -199,6 +221,15 @@ export default function ModuleTraining() {
       if (error) throw error;
       
       setResult(data.analysis);
+      // Update progress
+      if (data.analysis?.viability_score && module) {
+        await updateProgress({
+          moduleId: module.id,
+          score: data.analysis.viability_score,
+          completionData: { analysis: data.analysis }
+        });
+      }
+      
       toast({
         title: "Análise concluída!",
         description: "Seu plano de carreira foi gerado.",
@@ -333,6 +364,175 @@ export default function ModuleTraining() {
       });
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const renderResultsDisplay = () => {
+    if (!result) return null;
+
+    switch (module?.name) {
+      case 'curriculum_analysis':
+        return (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Análise do Currículo
+                <Badge variant="secondary" className="ml-auto">
+                  Score: {result.overall_score}/100
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-semibold text-green-700 mb-2">✅ Pontos Fortes</h4>
+                  <ul className="space-y-1">
+                    {result.strengths?.map((strength: string, index: number) => (
+                      <li key={index} className="text-sm text-gray-700">• {strength}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-orange-700 mb-2">⚡ Melhorias</h4>
+                  <ul className="space-y-1">
+                    {result.weaknesses?.map((weakness: string, index: number) => (
+                      <li key={index} className="text-sm text-gray-700">• {weakness}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              
+              {result.keyword_analysis && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold mb-2">📊 Análise ATS (Score: {result.keyword_analysis.ats_score}/100)</h4>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-green-600">Palavras presentes:</span>
+                      <p>{result.keyword_analysis.present_keywords?.join(', ')}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-red-600">Palavras ausentes:</span>
+                      <p>{result.keyword_analysis.missing_keywords?.join(', ')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      case 'communication_lab':
+        return (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Análise de Comunicação
+                <Badge variant="secondary" className="ml-auto">
+                  Score: {result.overall_score}/100
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Tabs defaultValue="analysis">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="analysis">Análise</TabsTrigger>
+                  <TabsTrigger value="improved">Versão Melhorada</TabsTrigger>
+                </TabsList>
+                <TabsContent value="analysis" className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-semibold text-green-700 mb-2">✅ Pontos Fortes</h4>
+                      <ul className="space-y-1">
+                        {result.strengths?.map((strength: string, index: number) => (
+                          <li key={index} className="text-sm text-gray-700">• {strength}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-orange-700 mb-2">🎯 Sugestões</h4>
+                      <ul className="space-y-1">
+                        {result.improvement_suggestions?.map((suggestion: string, index: number) => (
+                          <li key={index} className="text-sm text-gray-700">• {suggestion}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="improved">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-semibold mb-2">📝 Versão Otimizada</h4>
+                    <p className="text-gray-700 whitespace-pre-line">{result.improved_text}</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        );
+
+      case 'career_gps':
+        return (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Navigation className="h-5 w-5" />
+                Plano de Carreira Estratégico
+                <Badge variant="secondary" className="ml-auto">
+                  Viabilidade: {result.viability_score}/100
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="plan">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="plan">Plano de Ação</TabsTrigger>
+                  <TabsTrigger value="gaps">Gaps</TabsTrigger>
+                  <TabsTrigger value="timeline">Cronograma</TabsTrigger>
+                </TabsList>
+                <TabsContent value="plan" className="space-y-4">
+                  {result.action_plan?.steps?.map((step: any, index: number) => (
+                    <div key={index} className="border-l-4 border-primary pl-4">
+                      <h4 className="font-semibold">{step.title}</h4>
+                      <p className="text-gray-700 text-sm">{step.description}</p>
+                      <span className="text-xs text-gray-500">Prazo: {step.timeframe}</span>
+                    </div>
+                  ))}
+                </TabsContent>
+                <TabsContent value="gaps">
+                  <div className="space-y-3">
+                    {result.skill_gaps?.map((gap: string, index: number) => (
+                      <div key={index} className="p-3 bg-yellow-50 rounded-lg">
+                        <span className="text-sm">• {gap}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+                <TabsContent value="timeline">
+                  <div className="space-y-3">
+                    {result.milestone_timeline?.map((milestone: any, index: number) => (
+                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                        <Badge>{milestone.timeframe}</Badge>
+                        <span className="text-sm">{milestone.milestone}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        );
+
+      default:
+        return (
+          <Card className="mt-6">
+            <CardContent className="p-6">
+              <pre className="text-sm bg-gray-100 p-4 rounded-lg overflow-auto">
+                {JSON.stringify(result, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        );
     }
   };
 

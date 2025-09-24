@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Star, Trophy, Clock, ExternalLink, FileText, MessageSquare, Presentation, Database, Table, Target, Navigation } from "lucide-react";
 import { Link } from "react-router-dom";
+import ProgressTracker from "@/components/ProgressTracker";
+import SessionHistory from "@/components/SessionHistory";
 
 interface TrainingModule {
   id: string;
@@ -30,9 +33,8 @@ interface UserProgress {
 
 export default function Dashboard() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [modules, setModules] = useState<TrainingModule[]>([]);
-  const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
-  const [completedModules, setCompletedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const getIcon = (iconName: string) => {
@@ -49,7 +51,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchModules = async () => {
       try {
         // Fetch training modules
         const { data: modulesData } = await supabase
@@ -61,28 +63,6 @@ export default function Dashboard() {
         if (modulesData) {
           setModules(modulesData);
         }
-
-        // Fetch user progress
-        const { data: progressData } = await supabase
-          .from('user_progress')
-          .select('*')
-          .eq('user_id', profile?.user_id)
-          .single();
-
-        if (progressData) {
-          setUserProgress(progressData);
-        }
-
-        // Fetch completed modules
-        const { data: completionsData } = await supabase
-          .from('user_module_completions')
-          .select('module_id')
-          .eq('user_id', profile?.user_id);
-
-        if (completionsData) {
-          setCompletedModules(completionsData.map(c => c.module_id));
-        }
-
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -90,10 +70,8 @@ export default function Dashboard() {
       }
     };
 
-    if (profile?.user_id) {
-      fetchDashboardData();
-    }
-  }, [profile]);
+    fetchModules();
+  }, []);
 
   const getProficiencyLevel = (points: number) => {
     const levels = [
@@ -129,10 +107,6 @@ export default function Dashboard() {
     );
   }
 
-  const proficiencyLevel = getProficiencyLevel(userProgress?.total_points || 0);
-  const progressToNext = userProgress?.total_points || 0;
-  const nextLevelThreshold = proficiencyLevel.max === Infinity ? progressToNext : proficiencyLevel.max + 1;
-
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -140,160 +114,70 @@ export default function Dashboard() {
       <main className="flex-1 ml-64 overflow-y-auto">
         <div className="p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Bem-vindo ao Terminal, {profile?.full_name || 'Analista'}
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Bem-vindo de volta, {profile?.full_name}!
             </h1>
-            <p className="text-gray-600">
-              Seu centro de simulação para desenvolvimento estratégico
+            <p className="text-gray-600 mb-6">
+              Continue seu treinamento estratégico no Terminal
             </p>
           </div>
 
-          {/* Progress Overview */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-500" />
-                  Nível de Proficiência
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Badge className={`${proficiencyLevel.color} text-white`}>
-                      {proficiencyLevel.name}
-                    </Badge>
-                    <span className="text-sm font-medium">{progressToNext} pts</span>
-                  </div>
-                  {proficiencyLevel.max !== Infinity && (
-                    <Progress 
-                      value={(progressToNext / nextLevelThreshold) * 100} 
-                      className="h-2"
-                    />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Progress Tracker Component */}
+          <ProgressTracker />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-blue-500" />
-                  Módulos Concluídos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {userProgress?.modules_completed || 0}/{modules.length}
-                </div>
-                <p className="text-sm text-gray-600">
-                  {Math.round(((userProgress?.modules_completed || 0) / modules.length) * 100)}% concluído
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-green-500" />
-                  Simulações Realizadas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {userProgress?.simulations_completed || 0}
-                </div>
-                <p className="text-sm text-gray-600">
-                  Total de sessões
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Status da Assinatura</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="default" className="bg-green-100 text-green-800 mb-2">
-                  {profile?.subscription_status === 'active' ? 'Ativa' : 'Inativa'}
-                </Badge>
-                <p className="text-sm text-gray-600">
-                  Plano: {profile?.subscription_plan === 'annual' ? 'Anual' : 'Mensal'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Training Modules Grid */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Módulos de Treinamento
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {modules.map((module) => {
-                const IconComponent = getIcon(module.icon);
-                const isCompleted = completedModules.includes(module.id);
-                
-                return (
-                  <Card key={module.id} className={`transition-all hover:shadow-lg cursor-pointer ${
-                    isCompleted ? 'ring-2 ring-green-500 bg-green-50' : ''
-                  }`}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <IconComponent className={`h-8 w-8 ${
-                          isCompleted ? 'text-green-600' : 'text-primary'
-                        }`} />
-                        <div className="flex gap-2">
-                          <Badge className={getDifficultyColor(module.difficulty_level)} variant="outline">
-                            Nível {module.difficulty_level}
-                          </Badge>
-                          {isCompleted && (
-                            <Badge className="bg-green-100 text-green-800">
-                              Concluído
-                            </Badge>
-                          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Training Modules */}
+            <div className="lg:col-span-2">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Módulos de Treinamento</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {modules.map((module) => {
+                  const IconComponent = getIcon(module.icon);
+                  return (
+                    <Card key={module.id} className="group hover:shadow-lg transition-all duration-200 cursor-pointer border-2 hover:border-primary/20">
+                      <CardContent className="p-6">
+                        <div className="flex items-start gap-4">
+                          <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                            <IconComponent className="h-6 w-6 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 mb-2">{module.title}</h3>
+                            <p className="text-sm text-gray-600 mb-4 line-clamp-2">{module.description}</p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <span>🎯 Nível {module.difficulty_level}</span>
+                                <span>⏱️ {module.estimated_time_minutes}min</span>
+                                <span>💎 {module.points_reward}pts</span>
+                              </div>
+                            </div>
+                            <Button 
+                              className="w-full mt-4" 
+                              onClick={() => {
+                                if (module.name === 'interview_dojo') {
+                                  navigate('/interview-dojo');
+                                } else {
+                                  navigate(`/training/${module.name}`);
+                                }
+                              }}
+                            >
+                              Iniciar Módulo
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <CardTitle className="text-lg">{module.title}</CardTitle>
-                      <CardDescription>{module.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Clock className="h-4 w-4" />
-                          {module.estimated_time_minutes} min
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-yellow-600">
-                          <Star className="h-4 w-4" />
-                          {module.points_reward} pts
-                        </div>
-                      </div>
-                      
-                <Link to={`/module/${module.name}`}>
-                  <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
-                    {module.name === 'interview_dojo' ? (
-                      <Link to="/interview-dojo" className="w-full">
-                        <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
-                          {isCompleted ? 'Refazer Simulação' : 'Iniciar Simulação'}
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Button className="w-full" variant={isCompleted ? "outline" : "default"}>
-                        {isCompleted ? 'Refazer Simulação' : 'Iniciar Simulação'}
-                      </Button>
-                    )}
-                  </Button>
-                </Link>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Session History */}
+            <div className="lg:col-span-1">
+              <SessionHistory />
             </div>
           </div>
 
           {/* Bonus Course Access */}
-          <Card>
+          <Card className="mt-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ExternalLink className="h-5 w-5 text-primary" />
