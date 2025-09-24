@@ -105,6 +105,20 @@ export default function ModuleTraining() {
 
         if (error) throw error;
         
+        if (moduleData) {
+          setModule(moduleData);
+        }
+      } catch (error) {
+        console.error('Error fetching module:', error);
+        navigate('/dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchModule();
+  }, [moduleName, navigate, trialAccess]);
+
   const startSimulation = async (data: any) => {
     if (!module || !user || !canAccess) return;
     
