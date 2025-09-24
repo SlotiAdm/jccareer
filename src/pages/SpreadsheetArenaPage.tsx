@@ -11,7 +11,7 @@ export default function SpreadsheetArenaPage() {
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
-      <main className="flex-1 lg:ml-64 overflow-y-auto pt-16 lg:pt-8">
+      <main className="flex-1 lg:ml-64 overflow-y-auto pt-16 lg:pt-8 overscroll-contain">
         <div className="max-w-5xl mx-auto p-6">
           <Card className="mb-6">
             <CardHeader>

@@ -80,7 +80,7 @@ export const Sidebar = () => {
         <Button
           variant="outline"
           size="sm"
-          className="fixed top-4 left-4 z-50 lg:hidden"
+          className="fixed top-4 left-4 z-40 lg:hidden"
           onClick={() => setIsOpen(true)}
         >
           <Menu className="h-5 w-5" />
@@ -88,9 +88,9 @@ export const Sidebar = () => {
 
         {/* Mobile sidebar overlay */}
         {isOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 z-30 lg:hidden">
             <div className="fixed inset-0 bg-black/50" onClick={() => setIsOpen(false)} />
-            <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200">
+            <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 overflow-y-auto overscroll-contain">
               {sidebarContent}
             </div>
           </div>

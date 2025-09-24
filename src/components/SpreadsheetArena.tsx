@@ -9,7 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Trophy, Target, Zap, Brain } from 'lucide-react';
+import { Trophy, Target, Zap, Brain, PlayCircle } from 'lucide-react';
+import SpreadsheetMiniSheet from './SpreadsheetMiniSheet';
 
 const levels = [
   {
@@ -43,9 +44,21 @@ const levels = [
 ];
 
 const challengeTypes = {
-  'formula_calculation': 'Cálculo de Fórmulas',
-  'pivot_analysis': 'Análise com Tabela Dinâmica',
-  'conditional_formatting': 'Formatação Condicional'
+  'formula_calculation': 'Cálculo de Fórmulas Avançadas',
+  'data_analysis': 'Análise e Limpeza de Dados',
+  'pivot_tables': 'Tabelas Dinâmicas',
+  'vlookup_hlookup': 'PROCV e PROCH',
+  'conditional_formatting': 'Formatação Condicional',
+  'charts_visualization': 'Gráficos e Visualização'
+};
+
+const challengeDescriptions: { [key: string]: string } = {
+  'formula_calculation': 'Use fórmulas avançadas como SOMASES, CONT.SES para análises complexas',
+  'data_analysis': 'Organize e limpe dados bagunçados, remova duplicatas e padronize formatos',
+  'pivot_tables': 'Crie tabelas dinâmicas para resumir e analisar grandes volumes de dados',
+  'vlookup_hlookup': 'Conecte dados entre planilhas usando PROCV e outras funções de busca',
+  'conditional_formatting': 'Destaque automaticamente dados importantes com formatação condicional',
+  'charts_visualization': 'Transforme dados em gráficos informativos e dashboards visuais'
 };
 
 interface SpreadsheetArenaProps {
@@ -64,24 +77,16 @@ export default function SpreadsheetArena({ onComplete }: SpreadsheetArenaProps) 
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const handleSubmitSolution = async () => {
-    if (!selectedChallenge || (!userFormula && !userApproach)) {
-      toast({
-        title: "Dados incompletos",
-        description: "Selecione um desafio e forneça sua solução.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleSubmitSolution = async (solutionData: { formula?: string; approach: string; file?: File }) => {
     setIsLoading(true);
     
     try {
       const { data, error } = await supabase.functions.invoke('spreadsheet-arena', {
         body: {
           challenge_type: selectedChallenge,
-          user_formula: userFormula,
-          user_approach: userApproach,
+          user_formula: solutionData.formula || userFormula,
+          user_approach: solutionData.approach,
+          challenge_data: { level: currentLevel },
           user_id: user?.id
         }
       });
@@ -188,61 +193,48 @@ export default function SpreadsheetArena({ onComplete }: SpreadsheetArenaProps) 
                   <SelectContent>
                     {Object.entries(challengeTypes).map(([key, value]) => (
                       <SelectItem key={key} value={key}>
-                        {value}
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{value}</span>
+                          <span className="text-xs text-gray-500">{challengeDescriptions[key]}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Campos de resposta */}
+              {/* Descrição do desafio selecionado */}
               {selectedChallenge && (
-                <div className="space-y-4">
-                  {(selectedChallenge === 'formula_calculation') && (
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Sua Fórmula:
-                      </label>
-                      <Textarea
-                        placeholder="Ex: =AVERAGEIFS(C:C, A:A, 'Norte', B:B, '<>Beta')"
-                        value={userFormula}
-                        onChange={(e) => setUserFormula(e.target.value)}
-                        className="font-mono"
-                      />
-                    </div>
-                  )}
-                  
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Sua Abordagem/Estratégia:
-                    </label>
-                    <Textarea
-                      placeholder="Descreva como você resolveria este desafio..."
-                      value={userApproach}
-                      onChange={(e) => setUserApproach(e.target.value)}
-                      rows={4}
-                    />
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PlayCircle className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-900">Desafio Selecionado</span>
                   </div>
+                  <p className="text-sm text-blue-800">
+                    {challengeDescriptions[selectedChallenge]}
+                  </p>
                 </div>
               )}
-
-              {/* Botões de ação */}
-              <div className="flex gap-2 pt-4">
-                <Button 
-                  onClick={handleSubmitSolution}
-                  disabled={isLoading || !selectedChallenge}
-                  className="flex-1"
-                >
-                  {isLoading ? 'Analisando...' : 'Enviar Solução'}
-                </Button>
-                {results && (
-                  <Button variant="outline" onClick={resetChallenge}>
-                    Novo Desafio
-                  </Button>
-                )}
-              </div>
             </CardContent>
           </Card>
+
+          {/* Mini planilha de trabalho */}
+          {selectedChallenge && (
+            <SpreadsheetMiniSheet
+              challengeData={{ type: selectedChallenge, level: currentLevel }}
+              onSolutionSubmit={handleSubmitSolution}
+              isLoading={isLoading}
+            />
+          )}
+
+          {/* Botão reset */}
+          {results && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={resetChallenge}>
+                Escolher Novo Desafio
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="results" className="space-y-6">

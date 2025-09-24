@@ -205,6 +205,8 @@ export default function Dashboard() {
                                   navigate('/spreadsheet-arena');
                                 } else if (module.name === 'erp_simulator') {
                                   navigate('/erp-simulator');
+                                } else if (module.name === 'erp_training') {
+                                  navigate('/erp-training');
                                 } else {
                                   navigate(`/training/${module.name}`);
                                 }

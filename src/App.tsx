@@ -16,6 +16,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import SpreadsheetArenaPage from "./pages/SpreadsheetArenaPage";
 import ErpSimulator from "./pages/ErpSimulator";
+import ErpTraining from "./pages/ErpTraining";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import CommunicationLab from "./pages/CommunicationLab";
 import BSCStrategic from "./pages/BSCStrategic";
@@ -85,6 +86,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresActiveSubscription>
                   <ErpSimulator />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/erp-training" 
+              element={
+                <ProtectedRoute requiresActiveSubscription>
+                  <ErpTraining />
                 </ProtectedRoute>
               } 
             />
