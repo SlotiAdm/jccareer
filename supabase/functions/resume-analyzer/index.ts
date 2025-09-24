@@ -8,8 +8,10 @@ const corsHeaders = {
 };
 
 interface ResumeAnalysisRequest {
+  action: "analyze" | "generate";
   originalResume: string;
   jobDescription?: string;
+  previousAnalysis?: any;
   user_id?: string;
 }
 
@@ -90,6 +92,15 @@ serve(async (req) => {
     }
 
     // Input validation
+    if (!requestData.action || !['analyze', 'generate'].includes(requestData.action)) {
+      return new Response(JSON.stringify({ 
+        error: 'Ação inválida. Use "analyze" ou "generate".' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (!requestData.originalResume || requestData.originalResume.trim().length < 50) {
       return new Response(JSON.stringify({ 
         error: 'Currículo deve ter pelo menos 50 caracteres' 
@@ -108,32 +119,92 @@ serve(async (req) => {
       });
     }
 
-    const prompt = `Você é um 'Recruiter-AI' de elite. Sua missão é receber um currículo bruto e a descrição de uma vaga-alvo e sintetizar um novo currículo otimizado.
+    // Token system - check and deduct tokens BEFORE calling OpenAI
+    const tokenCost = requestData.action === 'analyze' ? 80 : 120; // Different costs for different actions
+    
+    if (user) {
+      const { data: hasTokens, error: tokenError } = await supabase.rpc('check_and_deduct_tokens', {
+        p_user_id: user.id,
+        p_token_cost: tokenCost
+      });
+
+      if (tokenError) {
+        console.error('Token check error:', tokenError);
+        return new Response(JSON.stringify({ 
+          error: 'Erro interno. Tente novamente.' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!hasTokens) {
+        return new Response(JSON.stringify({ 
+          error: 'Tokens insuficientes. Renove sua assinatura ou aguarde a renovação mensal.',
+          errorCode: 'INSUFFICIENT_TOKENS'
+        }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    let prompt: string;
+    
+    if (requestData.action === 'analyze') {
+      prompt = `Você é um 'Recruiter-AI' de elite especializado em diagnóstico de currículos. Analise o currículo fornecido e forneça um diagnóstico detalhado.
 
 CURRÍCULO ORIGINAL:
 ${requestData.originalResume}
 
 ${requestData.jobDescription ? `DESCRIÇÃO DA VAGA ALVO:\n${requestData.jobDescription}` : 'ANÁLISE GERAL (sem vaga específica)'}
 
-Sua análise deve ser baseada em três pilares:
+Faça uma análise CRÍTICA e ESTRATÉGICA do currículo atual, identificando:
 
-1. **Metodologia STAR**: Reescreva cada ponto de experiência profissional para refletir Situação-Tarefa-Ação-Resultado, quantificando o impacto sempre que possível.
+1. **Pontos Fortes**: O que já está bem estruturado
+2. **Gaps Críticos**: O que está faltando ou mal posicionado
+3. **Oportunidades ATS**: Palavras-chave e formatação para sistemas automatizados
+4. **Impacto STAR**: Onde aplicar Situação-Tarefa-Ação-Resultado
 
-2. **Otimização ATS**: ${requestData.jobDescription ? 'Analise a descrição da vaga, extraia as 10-15 palavras-chave e competências mais importantes e garanta que elas estejam naturalmente integradas no novo currículo.' : 'Identifique palavras-chave relevantes para a área e garanta que estejam presentes no currículo.'}
-
-3. **Melhores Práticas de Mercado**: Aplique as regras de um currículo moderno: um resumo de impacto no topo, ordem cronológica inversa, clareza, objetividade e uso de verbos de ação.
-
-Retorne APENAS um JSON válido no seguinte formato:
+Retorne APENAS um JSON válido:
 {
-  "optimizedResume": "CURRÍCULO COMPLETO REESCRITO AQUI, formatado em seções claras: RESUMO EXECUTIVO, EXPERIÊNCIA PROFISSIONAL, FORMAÇÃO, COMPETÊNCIAS TÉCNICAS, IDIOMAS (se aplicável)",
-  "improvementNotes": {
-    "keywordOptimization": ["lista das palavras-chave adicionadas/otimizadas"],
-    "starMethodology": ["lista das experiências reescritas usando STAR"],
-    "structuralChanges": ["lista das principais mudanças estruturais"],
-    "atsOptimizations": ["lista das otimizações para ATS"]
-  },
-  "score": 85
+  "diagnosis": "Texto corrido com análise completa e detalhada do currículo, incluindo pontos fortes, fracos e oportunidades de melhoria. Seja específico e prático.",
+  "keyInsights": [
+    "Insight 1 sobre formatação ou estrutura",
+    "Insight 2 sobre conteúdo ou palavras-chave", 
+    "Insight 3 sobre experiências ou competências",
+    "Insight 4 sobre adequação à vaga"
+  ],
+  "score": 65
 }`;
+    } else {
+      prompt = `Você é um 'Recruiter-AI' de elite. Use a análise anterior para gerar um currículo otimizado.
+
+CURRÍCULO ORIGINAL:
+${requestData.originalResume}
+
+${requestData.jobDescription ? `DESCRIÇÃO DA VAGA ALVO:\n${requestData.jobDescription}` : 'ANÁLISE GERAL (sem vaga específica)'}
+
+${requestData.previousAnalysis ? `ANÁLISE ANTERIOR:\n${JSON.stringify(requestData.previousAnalysis)}` : ''}
+
+Baseado na análise, reescreva o currículo aplicando:
+
+1. **Metodologia STAR**: Experiências com Situação-Tarefa-Ação-Resultado quantificado
+2. **Otimização ATS**: Palavras-chave estratégicas integradas naturalmente  
+3. **Melhores Práticas**: Resumo executivo, ordem cronológica inversa, verbos de ação
+
+Retorne APENAS um JSON válido:
+{
+  "optimizedResume": "CURRÍCULO COMPLETO REESCRITO, formatado profissionalmente com seções claras: RESUMO EXECUTIVO, EXPERIÊNCIA PROFISSIONAL, FORMAÇÃO, COMPETÊNCIAS TÉCNICAS, IDIOMAS (se aplicável)",
+  "improvementNotes": {
+    "keywordOptimization": ["palavras-chave adicionadas/otimizadas"],
+    "starMethodology": ["experiências reescritas usando STAR"],
+    "structuralChanges": ["mudanças estruturais principais"],
+    "atsOptimizations": ["otimizações para ATS aplicadas"]
+  },
+  "score": 90
+}`;
+    }
 
     console.log('Calling OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -154,7 +225,7 @@ Retorne APENAS um JSON válido no seguinte formato:
             content: prompt
           }
         ],
-        max_tokens: 2500,
+        max_tokens: requestData.action === 'analyze' ? 1500 : 2500,
         temperature: 0.7,
       }),
     });
@@ -207,17 +278,20 @@ Retorne APENAS um JSON válido no seguinte formato:
       });
     }
 
-    // Save results
+    // Save results and log API usage
     try {
-      await supabase
-        .from('generated_resumes')
-        .insert({
-          user_id: user.id,
-          original_resume: requestData.originalResume,
-          job_description: requestData.jobDescription || null,
-          generated_resume: analysisResult.optimizedResume,
-          improvements_notes: analysisResult.improvementNotes
-        });
+      // Save to generated_resumes only if generating optimized resume
+      if (requestData.action === 'generate' && analysisResult.optimizedResume) {
+        await supabase
+          .from('generated_resumes')
+          .insert({
+            user_id: user.id,
+            original_resume: requestData.originalResume,
+            job_description: requestData.jobDescription || null,
+            generated_resume: analysisResult.optimizedResume,
+            improvements_notes: analysisResult.improvementNotes
+          });
+      }
 
       // Get module ID for session tracking
       const { data: moduleData } = await supabase
@@ -232,30 +306,32 @@ Retorne APENAS um JSON válido no seguinte formato:
           .insert({
             user_id: user.id,
             module_id: moduleData.id,
-            session_type: 'resume_analysis',
+            session_type: requestData.action === 'analyze' ? 'resume_analysis' : 'resume_generation',
             input_data: {
+              action: requestData.action,
               original_resume: requestData.originalResume,
               job_description: requestData.jobDescription
             },
             ai_response: analysisResult,
+            feedback: requestData.action === 'analyze' ? analysisResult.diagnosis : `Currículo otimizado gerado com score ${analysisResult.score}`,
             score: analysisResult.score || null,
             completed: true
           });
+      }
+
+      // Log API cost with proper token usage
+      if (data.usage) {
+        await supabase.rpc('log_api_cost', {
+          p_user_id: user.id,
+          p_module_name: 'resume_analyzer',
+          p_prompt_tokens: data.usage.prompt_tokens,
+          p_completion_tokens: data.usage.completion_tokens
+        });
       }
     } catch (saveError) {
       console.error('Error saving results:', saveError);
       // Continue without throwing error
     }
-
-    // Log API usage
-    await supabase.rpc('log_api_usage', {
-      p_user_id: user.id,
-      p_module_name: 'resume_analyzer',
-      p_function_name: 'analyze_resume',
-      p_input_tokens: data.usage?.prompt_tokens || 0,
-      p_output_tokens: data.usage?.completion_tokens || 0,
-      p_cost_estimate: ((data.usage?.prompt_tokens || 0) * 0.00015 + (data.usage?.completion_tokens || 0) * 0.0002) / 1000
-    });
 
     console.log('Analysis completed successfully');
     return new Response(JSON.stringify(analysisResult), {

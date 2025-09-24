@@ -193,10 +193,10 @@ export function useGameification() {
   };
 
   const getNextSuggestedModule = () => {
-    // Logic to suggest next module based on progress and gaps
+    // Order 3: Updated categorization - Arsenal vs Dojo tools
     const modulesByCategory = {
-      dojos: ['resume-analyzer', 'interview-dojo', 'erp-simulator', 'spreadsheet-arena', 'bsc-strategic', 'career-gps'],
-      arsenalTools: ['communication-lab']
+      dojos: ['interview-dojo', 'erp-simulator', 'spreadsheet-arena', 'bsc-strategic'],
+      arsenalTools: ['resume-analyzer', 'communication-lab'] // These give fixed points, not performance scores
     };
 
     // Find least completed dojo

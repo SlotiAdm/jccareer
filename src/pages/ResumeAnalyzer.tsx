@@ -15,7 +15,9 @@ export default function ResumeAnalyzer() {
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
   const [uploadMethod, setUploadMethod] = useState<"text" | "file">("text");
+  const [currentStep, setCurrentStep] = useState<"input" | "analysis" | "optimized">("input");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -67,6 +69,7 @@ export default function ResumeAnalyzer() {
     try {
       const { data, error } = await supabase.functions.invoke('resume-analyzer', {
         body: {
+          action: "analyze",
           originalResume: originalResume.trim(),
           jobDescription: jobDescription.trim(),
           user_id: user?.id
@@ -74,20 +77,58 @@ export default function ResumeAnalyzer() {
       });
 
       if (error) {
-        const message = (data as any)?.error || error.message || 'Erro ao gerar currículo';
+        const message = (data as any)?.error || error.message || 'Erro ao analisar currículo';
         throw new Error(message);
       }
 
-      setResult(data);
+      setAnalysis(data);
+      setCurrentStep("analysis");
       toast({
         title: "Análise concluída!",
-        description: "Seu currículo estratégico foi gerado com sucesso.",
+        description: "Diagnóstico do seu currículo pronto.",
       });
     } catch (error: any) {
       console.error('Erro na análise:', error);
       toast({
         title: "Erro na análise",
         description: error?.message || "Alta demanda no momento. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGenerateOptimized = async () => {
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('resume-analyzer', {
+        body: {
+          action: "generate",
+          originalResume: originalResume.trim(),
+          jobDescription: jobDescription.trim(),
+          previousAnalysis: analysis,
+          user_id: user?.id
+        }
+      });
+
+      if (error) {
+        const message = (data as any)?.error || error.message || 'Erro ao gerar currículo otimizado';
+        throw new Error(message);
+      }
+
+      setResult(data);
+      setCurrentStep("optimized");
+      toast({
+        title: "Currículo otimizado gerado!",
+        description: "Seu currículo estratégico está pronto.",
+      });
+    } catch (error: any) {
+      console.error('Erro na geração:', error);
+      toast({
+        title: "Erro na geração",
+        description: error?.message || "Erro ao gerar currículo otimizado.",
         variant: "destructive"
       });
     } finally {
@@ -135,7 +176,7 @@ export default function ResumeAnalyzer() {
             </CardHeader>
           </Card>
 
-          {!result ? (
+          {currentStep === "input" ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Input Area */}
               <Card>
@@ -220,7 +261,7 @@ export default function ResumeAnalyzer() {
           ) : null}
 
           {/* Action Button */}
-          {!result && (
+          {currentStep === "input" && (
             <div className="mt-6 text-center">
               <Button
                 onClick={handleAnalyzeResume}
@@ -231,20 +272,119 @@ export default function ResumeAnalyzer() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Gerando seu Currículo Estratégico...
+                    Analisando seu currículo...
                   </>
                 ) : (
                   <>
-                    <Zap className="mr-2 h-5 w-5" />
-                    Gerar meu Currículo Estratégico
+                    <Target className="mr-2 h-5 w-5" />
+                    Fazer Raio-X do Currículo
                   </>
                 )}
               </Button>
             </div>
           )}
 
-          {/* Results */}
-          {result && (
+          {/* Analysis Results */}
+          {currentStep === "analysis" && analysis && (
+            <div className="mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Analysis Details */}
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-blue-600" />
+                        Diagnóstico Completo
+                      </CardTitle>
+                      <CardDescription>
+                        Análise estratégica do seu currículo atual
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {analysis.diagnosis && (
+                        <div className="bg-muted/30 p-4 rounded-lg">
+                          <pre className="whitespace-pre-wrap text-sm">
+                            {analysis.diagnosis}
+                          </pre>
+                        </div>
+                      )}
+                      
+                      {analysis.keyInsights && (
+                        <div>
+                          <h4 className="font-semibold mb-2">💡 Insights Principais</h4>
+                          <ul className="space-y-2">
+                            {analysis.keyInsights.map((insight: string, index: number) => (
+                              <li key={index} className="text-sm flex items-start gap-2">
+                                <span className="text-primary">•</span>
+                                <span>{insight}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Action Panel */}
+                <div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        Próximo Passo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {analysis.score && (
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-primary mb-2">
+                            {analysis.score}%
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Score Atual
+                          </p>
+                        </div>
+                      )}
+                      
+                      <Button 
+                        onClick={handleGenerateOptimized}
+                        disabled={isLoading}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        size="lg"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="mr-2 h-4 w-4" />
+                            Gerar Currículo Otimizado
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          setCurrentStep("input");
+                          setAnalysis(null);
+                        }}
+                        className="w-full"
+                      >
+                        Nova Análise
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Optimized Results */}
+          {currentStep === "optimized" && result && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Generated Resume */}
               <div className="lg:col-span-2">
@@ -355,16 +495,26 @@ export default function ResumeAnalyzer() {
                   </CardContent>
                 </Card>
 
-                <div className="mt-4 text-center">
+                <div className="mt-4 text-center space-y-2">
                   <Button
                     variant="outline"
                     onClick={() => {
+                      setCurrentStep("input");
+                      setAnalysis(null);
                       setResult(null);
                       setOriginalResume("");
                       setJobDescription("");
                     }}
+                    className="w-full"
                   >
                     Nova Análise
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setCurrentStep("analysis")}
+                    className="w-full"
+                  >
+                    Ver Diagnóstico
                   </Button>
                 </div>
               </div>

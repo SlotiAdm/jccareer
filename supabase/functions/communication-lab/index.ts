@@ -61,25 +61,50 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+
+    // Get authenticated user for token system
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Rate limiting check for authenticated users
-    if (user_id) {
-      const { data: rateLimitOk } = await supabase.rpc('check_rate_limit', {
-        p_user_id: user_id,
-        p_module_name: 'communication-lab',
-        p_limit_per_hour: 30
-      });
-
-      if (!rateLimitOk) {
-        return new Response(JSON.stringify({
-          error: 'Rate limit exceeded. Please try again later.'
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    let authenticatedUser = null;
+    
+    // Get authorization header
+    const authHeader = req.headers.get('authorization');
+    if (authHeader) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(
+        authHeader.replace('Bearer ', '')
+      );
+      
+      if (!authError && user) {
+        authenticatedUser = user;
+        
+        // Token system - check and deduct tokens
+        const tokenCost = 15; // Fixed cost for communication lab
+        const { data: hasTokens, error: tokenError } = await supabase.rpc('check_and_deduct_tokens', {
+          p_user_id: user.id,
+          p_token_cost: tokenCost
         });
+
+        if (tokenError) {
+          console.error('Token check error:', tokenError);
+          return new Response(JSON.stringify({ 
+            error: 'Erro interno. Tente novamente.' 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!hasTokens) {
+          return new Response(JSON.stringify({ 
+            error: 'Tokens insuficientes. Renove sua assinatura ou aguarde a renovação mensal.',
+            errorCode: 'INSUFFICIENT_TOKENS'
+          }), {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
 
@@ -183,8 +208,8 @@ serve(async (req) => {
       throw new Error('Erro ao processar resposta da IA');
     }
 
-    // Save simulation session
-    if (user_id) {
+    // Save simulation session (Order 3: Fixed scoring for arsenal tools)
+    if (authenticatedUser) {
       const { data: moduleData } = await supabase
         .from('training_modules')
         .select('id')
@@ -195,21 +220,34 @@ serve(async (req) => {
         await supabase
           .from('simulation_sessions')
           .insert({
-            user_id,
+            user_id: authenticatedUser.id,
             module_id: moduleData.id,
             session_type: `communication_${scenario}`,
             input_data: { scenario, user_text: sanitizedInput.sanitized },
             ai_response: analysis,
-            score: analysis.overall_score,
+            feedback: `Análise de comunicação concluída para ${scenarioDescription}. Texto melhorado e insights fornecidos.`,
+            score: null, // Remove scoring for arsenal tools
             completed: true
           });
 
-        // Log API usage
-        await supabase.rpc('log_api_usage', {
-          p_user_id: user_id,
-          p_module_name: 'communication-lab',
-          p_function_name: 'communication_analysis'
+        // Order 3: Give fixed points for arsenal usage (not performance-based)
+        const fixedPoints = 15;
+        await supabase.rpc('update_module_progress', {
+          p_user_id: authenticatedUser.id,
+          p_module_name: 'communication_lab',
+          p_score: fixedPoints, // Fixed points, not performance score
+          p_time_spent: 0
         });
+
+        // Log API cost with proper token usage
+        if (data.usage) {
+          await supabase.rpc('log_api_cost', {
+            p_user_id: authenticatedUser.id,
+            p_module_name: 'communication_lab',
+            p_prompt_tokens: data.usage.prompt_tokens,
+            p_completion_tokens: data.usage.completion_tokens
+          });
+        }
       }
     }
 

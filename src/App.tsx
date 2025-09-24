@@ -26,6 +26,7 @@ const ErpTraining = lazy(() => import("./pages/ErpTraining"));
 const ResumeAnalyzer = lazy(() => import("./pages/ResumeAnalyzer"));
 const CommunicationLab = lazy(() => import("./pages/CommunicationLab"));
 const BSCStrategic = lazy(() => import("./pages/BSCStrategic"));
+const Documentation = lazy(() => import("./pages/Documentation"));
 
 // Configurar QueryClient com otimizações de performance
 const queryClient = new QueryClient({
@@ -150,6 +151,16 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Order 6: Documentation Page */}
+            <Route 
+              path="/documentacao" 
+              element={
+                <ProtectedRoute>
+                  <Documentation />
                 </ProtectedRoute>
               } 
             />
