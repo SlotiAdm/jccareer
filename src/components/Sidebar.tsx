@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Zap, MessageCircle, Settings, LogOut, Menu, X } from "lucide-react";
+import { Home, Zap, MessageCircle, Settings, LogOut, Menu, X, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-const navigation = [
+const baseNavigation = [
   { name: "Início", href: "/dashboard", icon: Home },
   { name: "Comunidade", href: "#", icon: MessageCircle },
   { name: "Configurações", href: "/settings", icon: Settings },
@@ -14,9 +14,18 @@ const navigation = [
 
 export const Sidebar = () => {
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Adicionar link admin apenas para administradores
+  const navigation = profile?.is_admin 
+    ? [
+        ...baseNavigation.slice(0, -1), // Todos exceto configurações
+        { name: "Admin", href: "/admin", icon: Shield },
+        baseNavigation[baseNavigation.length - 1] // Configurações por último
+      ]
+    : baseNavigation;
 
   const sidebarContent = (
     <>
